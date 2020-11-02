@@ -413,7 +413,7 @@ def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, pruning_acc=N
     return pruned_model
     
     
-    def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10):
+def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10):
     """
     A given keras model get pruned. The factor for dense and conv says how many percent
     of the dense and conv layers should be deleted. After pruning the model will be
