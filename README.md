@@ -1,5 +1,5 @@
 # Automatic-Structured-Pruning
-We have implemented a framework that supports developers in designing neural networks.
+We have implemented a framework that supports developers to structured prune neural networks.
 The framework is still under development and will be extended from time to time.
 
 # Features:
