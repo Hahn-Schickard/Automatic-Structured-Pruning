@@ -206,7 +206,7 @@ def prun_filters_conv(layer_names, layer_params, layer_output_shape, prun_layer,
     if not "conv" in layer_names[prun_layer]:
         print("No Conv layer!")
         return None, None
-    print(prun_factor)
+    #print(prun_factor)
     if prun_factor > 0:
         'Load the filters of the conv layer and add a array where the' 
         'absolut average filter values will be stored'
@@ -295,8 +295,6 @@ def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neuro
     """
     
     model_config = pruned_model.get_config()
-    print('num_new_filters')
-    print(num_new_filters)
 
     print(num_new_neurons)
     for i in range(0,len(model_config['layers'])-3):
