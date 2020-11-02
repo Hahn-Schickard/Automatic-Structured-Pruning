@@ -411,3 +411,39 @@ def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, pruning_acc=N
             pruned_model = model
     
     return pruned_model
+    
+    
+    def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10):
+    """
+    A given keras model get pruned. The factor for dense and conv says how many percent
+    of the dense and conv layers should be deleted. After pruning the model will be
+    retrained.
+    
+    Args: 
+        keras_model: Model which should be pruned
+        prun_factor_dense: Integer which says how many percent of the neurons should be deleted
+        prun_factor_conv: Integer which says how many percent of the filters should be deleted
+        
+    Return: 
+        pruned_model: New model after pruning 
+    """
+    
+    if callable(getattr(keras_model, "predict", None)) :
+        model = keras_model
+    elif isinstance(keras_model, str) and ".h5" in keras_model:
+        model = load_model(keras_model)
+    else:
+        print("No model given to prune")
+    
+    
+    layer_names, layer_params, layer_output_shape = load_model_param(model)
+    num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
+    num_new_filters = np.zeros(shape=len(layer_params), dtype=np.int16)
+
+    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv)
+
+    print("Finish with pruning")
+
+    pruned_model = build_pruned_model(model, layer_params, layer_names, num_new_neurons, num_new_filters)
+    
+    return pruned_model
