@@ -3,7 +3,7 @@ We have implemented a framework that supports developers to structured prune neu
 The framework is still under development and will be extended from time to time.
 
 # Features:
-- Prune from filter
+- Prune of filters / channels
 - Prune of neurons
 - Automatic pruning to minimum accuracy
 
