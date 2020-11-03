@@ -5,7 +5,7 @@ from tensorflow.keras.models import Sequential
 import numpy as np
 from keras.callbacks import EarlyStopping
 import tensorflow as tf
-print(tf.__version__)
+#print(tf.__version__)
 
 def load_model_param(model):
     """
