@@ -278,7 +278,7 @@ def model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons
 
 
 
-def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neurons, num_new_filters):
+def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neurons, num_new_filters,comp):
     """
     The new number of neurons and filters are changed in the model config.
     Load the new weight matrices into the model.
@@ -315,7 +315,7 @@ def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neuro
     print("After pruning:")
     pruned_model.summary()
     
-    pruned_model.compile(optimizer='adam', metrics=['accuracy'], loss='categorical_crossentropy')
+    pruned_model.compile(**comp)
     
     
     for i in range(0,len(pruned_model.layers)):
@@ -326,7 +326,7 @@ def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neuro
 
 
 
-def pruning(keras_model, x_train, y_train, prun_factor_dense=10, prun_factor_conv=10):
+def pruning(keras_model, x_train, y_train,comp,fit, prun_factor_dense=10, prun_factor_conv=10):
     """
     A given keras model get pruned. The factor for dense and conv says how many percent
     of the dense and conv layers should be deleted. After pruning the model will be
@@ -359,15 +359,15 @@ def pruning(keras_model, x_train, y_train, prun_factor_dense=10, prun_factor_con
 
     print("Finish with pruning")
 
-    pruned_model = build_pruned_model(model, layer_params, layer_names, num_new_neurons, num_new_filters)
+    pruned_model = build_pruned_model(model, layer_params, layer_names, num_new_neurons, num_new_filters,comp)
 
-    earlystopper = EarlyStopping(monitor='val_accuracy', min_delta= 1e-3, mode='min', verbose=1, patience=5, restore_best_weights=True)
-    history = pruned_model.fit(x_train, y_train, validation_split=0.2, epochs=100, batch_size=256, callbacks=[earlystopper])
+    #earlystopper = EarlyStopping(monitor='val_accuracy', min_delta= 1e-3, mode='min', verbose=1, patience=5, restore_best_weights=True)
+    history = pruned_model.fit(x_train, y_train, **fit)
     
     return pruned_model
 
 
-def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, pruning_acc=None, max_acc_loss=1):
+def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, comp,fit ,pruning_acc=None, max_acc_loss=1):
     """
     A given keras model get pruned. Either an accuracy value (in %) can be specified, which 
     the minimized model must still achieve. Or the maximum loss of accuracy (in %) that 
@@ -388,11 +388,11 @@ def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, pruning_acc=N
     """
     
     original_model = load_model(keras_model)
-    original_model.compile(optimizer='adam', metrics=['accuracy'], loss='categorical_crossentropy')
+    original_model.compile(**comp)
     original_model_acc = original_model.evaluate(x_test,y_test)[-1]
     
     for i in range(5,100,5):
-        model = pruning(original_model, x_train, y_train, prun_factor_dense=i, prun_factor_conv=i)
+        model = pruning(original_model, x_train, y_train,comp,fit, prun_factor_dense=i, prun_factor_conv=i)
         
         if pruning_acc != None:
             if model.evaluate(x_test,y_test)[-1] < pruning_acc:
@@ -411,7 +411,7 @@ def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, pruning_acc=N
     return pruned_model
     
     
-def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10):
+def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10,comp=None):
     """
     A given keras model get pruned. The factor for dense and conv says how many percent
     of the dense and conv layers should be deleted. After pruning the model will be
@@ -432,6 +432,12 @@ def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10):
         model = load_model(keras_model)
     else:
         print("No model given to prune")
+
+    if comp is None:
+      comp = {
+        "optimizer": 'adam',
+        "loss": tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        "metrics": 'accuracy'}    
     
     
     layer_names, layer_params, layer_output_shape = load_model_param(model)
@@ -442,6 +448,6 @@ def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10):
 
     print("Finish with pruning")
 
-    pruned_model = build_pruned_model(model, layer_params, layer_names, num_new_neurons, num_new_filters)
+    pruned_model = build_pruned_model(model, layer_params, layer_names, num_new_neurons, num_new_filters,comp)
     
     return pruned_model
