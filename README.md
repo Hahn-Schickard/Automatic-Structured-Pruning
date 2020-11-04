@@ -8,6 +8,7 @@ The framework is still under development and will be extended from time to time.
 - Automatic pruning to minimum accuracy
 
 
+
 # Restrictions:
 - There are only SequentialModels Pruneable
 - Tensorflow 2.1 to 2.3.1 is supported
