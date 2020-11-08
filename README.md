@@ -21,6 +21,7 @@ The framework is still under development and will be extended from time to time.
 - not only Sequential models to prune
 - Resnet support
 - do you have an idea? please write to Marcus.rueb@hahn-schickard.de or create an issue.
+- Train from scratch
 
 
 # How to start?
