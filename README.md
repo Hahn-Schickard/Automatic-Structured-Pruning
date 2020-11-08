@@ -6,6 +6,7 @@ The framework is still under development and will be extended from time to time.
 - Prune of filters / channels
 - Prune of neurons
 - Automatic pruning to minimum accuracy
+- Prune metric: L1/L2 Norm
 
 
 
@@ -16,7 +17,7 @@ The framework is still under development and will be extended from time to time.
 
 
 # Upcoming functions:
-- More prune methods not only magnitude-based pruning
+- More prune methods not only l1/l2 norm
 - not only Sequential models to prune
 - Resnet support
 - do you have an idea? please write to Marcus.rueb@hahn-schickard.de or create an issue.
