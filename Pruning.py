@@ -123,6 +123,42 @@ def delete_filter(new_model_param, layer_name, layer_output_shape, layer, filter
     
     return new_model_param, layer_output_shape
 
+def get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor):
+    new_layer_param = layer_params[prun_layer]
+    avg_neuron_w = []
+
+    'Absolute average of the weights arriving at a neuron are written into an array'
+    for i in range (0,new_layer_param[0].shape[-1]):
+        avg_neuron_w.append(np.average(np.abs(new_layer_param[0][:,i]))) 
+
+    print(avg_neuron_w)
+    'Absolute average of the weights are sorted and a percantage of these which is given'
+    'through the prune factor are stored in prune_neurons, these neurons will be pruned'
+    prun_neurons = sorted(range(new_layer_param[0].shape[-1]), key=lambda k: avg_neuron_w[k])[:int((prun_factor*new_layer_param[0].shape[-1])/100)]
+    prun_neurons = np.sort(prun_neurons)
+
+    'The number of the new units of the dense layer are stored'
+    num_new_neurons = new_layer_param[0].shape[-1] - len(prun_neurons)
+    return prun_neurons,num_new_neurons
+
+def get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor):
+    new_layer_param = layer_params[prun_layer]
+    avg_neuron_w = []
+
+    'Absolute average of the weights arriving at a neuron are written into an array'
+    for i in range (0,new_layer_param[0].shape[-1]):
+        avg_neuron_w.append(np.linalg.norm(new_layer_param[0][:,i])) 
+
+    print(avg_neuron_w)
+    'Absolute average of the weights are sorted and a percantage of these which is given'
+    'through the prune factor are stored in prune_neurons, these neurons will be pruned'
+    prun_neurons = sorted(range(new_layer_param[0].shape[-1]), key=lambda k: avg_neuron_w[k])[:int((prun_factor*new_layer_param[0].shape[-1])/100)]
+    prun_neurons = np.sort(prun_neurons)
+
+    'The number of the new units of the dense layer are stored'
+    num_new_neurons = new_layer_param[0].shape[-1] - len(prun_neurons)
+    return prun_neurons,num_new_neurons
+
 
 
 def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer, prun_factor):
@@ -154,6 +190,11 @@ def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer
         new_layer_param = layer_params[prun_layer]
         avg_neuron_w = []
 
+        prun_neurons,num_new_neurons=get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor)
+        print(prun_neurons)
+        prun_neurons,num_new_neurons=get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor)
+        print(prun_neurons)
+        '''
         'Absolute average of the weights arriving at a neuron are written into an array'
         for i in range (0,new_layer_param[0].shape[-1]):
             avg_neuron_w.append(np.average(np.abs(new_layer_param[0][:,i]))) 
@@ -165,6 +206,7 @@ def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer
 
         'The number of the new units of the dense layer are stored'
         num_new_neurons = new_layer_param[0].shape[-1] - len(prun_neurons)
+        '''
 
         'Deleting the neurons, beginning with the neuron with the highest index'
         if len(prun_neurons) > 0:
