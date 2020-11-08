@@ -131,7 +131,7 @@ def get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor):
     for i in range (0,new_layer_param[0].shape[-1]):
         avg_neuron_w.append(np.average(np.abs(new_layer_param[0][:,i]))) 
 
-    print(avg_neuron_w)
+    
     'Absolute average of the weights are sorted and a percantage of these which is given'
     'through the prune factor are stored in prune_neurons, these neurons will be pruned'
     prun_neurons = sorted(range(new_layer_param[0].shape[-1]), key=lambda k: avg_neuron_w[k])[:int((prun_factor*new_layer_param[0].shape[-1])/100)]
@@ -149,7 +149,7 @@ def get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor):
     for i in range (0,new_layer_param[0].shape[-1]):
         avg_neuron_w.append(np.linalg.norm(new_layer_param[0][:,i])) 
 
-    print(avg_neuron_w)
+    
     'Absolute average of the weights are sorted and a percantage of these which is given'
     'through the prune factor are stored in prune_neurons, these neurons will be pruned'
     prun_neurons = sorted(range(new_layer_param[0].shape[-1]), key=lambda k: avg_neuron_w[k])[:int((prun_factor*new_layer_param[0].shape[-1])/100)]
@@ -161,7 +161,7 @@ def get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor):
 
 
 
-def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer, prun_factor):
+def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer, prun_factor,metric):
     """
     Deletes neurons from the dense layer. The prun_factor is telling how much percent of the 
     neurons of the dense layer should be deleted.
@@ -190,10 +190,13 @@ def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer
         new_layer_param = layer_params[prun_layer]
         avg_neuron_w = []
 
-        prun_neurons,num_new_neurons=get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor)
-        print(prun_neurons)
-        prun_neurons,num_new_neurons=get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor)
-        print(prun_neurons)
+        if metric is 'L1':
+            prun_neurons,num_new_neurons=get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor)
+        elif metric is 'L2':
+            prun_neurons,num_new_neurons=get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor)
+        else:
+            prun_neurons,num_new_neurons=get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor)
+
         '''
         'Absolute average of the weights arriving at a neuron are written into an array'
         for i in range (0,new_layer_param[0].shape[-1]):
@@ -285,7 +288,7 @@ def prun_filters_conv(layer_names, layer_params, layer_output_shape, prun_layer,
 
 
 
-def model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv):
+def model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric):
     """
     Deletes neurons and filters from all dense and conv layers. The two prunfactors are 
     telling how much percent of the neurons and the filters should be deleted.
@@ -308,7 +311,7 @@ def model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons
     
     for i in range(0,len(layer_params)-2):
         if "dense" in layer_names[i]:
-            layer_params, num_new_neurons[i], layer_output_shape = prun_neurons_dense(layer_names, layer_params, layer_output_shape, i, prun_factor_dense)
+            layer_params, num_new_neurons[i], layer_output_shape = prun_neurons_dense(layer_names, layer_params, layer_output_shape, i, prun_factor_dense,metric)
 
         elif "conv" in layer_names[i]:
             layer_params, num_new_filters[i], layer_output_shape = prun_filters_conv(layer_names, layer_params, layer_output_shape, i, prun_factor_conv)
@@ -368,7 +371,7 @@ def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neuro
 
 
 
-def pruning(keras_model, x_train, y_train,comp,fit, prun_factor_dense=10, prun_factor_conv=10):
+def pruning(keras_model, x_train, y_train,comp,fit, prun_factor_dense=10, prun_factor_conv=10,metric='L1'):
     """
     A given keras model get pruned. The factor for dense and conv says how many percent
     of the dense and conv layers should be deleted. After pruning the model will be
@@ -397,7 +400,7 @@ def pruning(keras_model, x_train, y_train,comp,fit, prun_factor_dense=10, prun_f
     num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
     num_new_filters = np.zeros(shape=len(layer_params), dtype=np.int16)
 
-    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv)
+    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric)
 
     print("Finish with pruning")
 
@@ -453,7 +456,7 @@ def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, comp,fit ,pru
     return pruned_model
     
     
-def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10,comp=None):
+def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10,metric='L1',comp=None):
     """
     A given keras model get pruned. The factor for dense and conv says how many percent
     of the dense and conv layers should be deleted. After pruning the model will be
@@ -486,7 +489,7 @@ def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10,comp=None
     num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
     num_new_filters = np.zeros(shape=len(layer_params), dtype=np.int16)
 
-    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv)
+    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric)
 
     print("Finish with pruning")
 
