@@ -124,6 +124,18 @@ def delete_filter(new_model_param, layer_name, layer_output_shape, layer, filter
     return new_model_param, layer_output_shape
 
 def get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor):
+    """
+    Calculate the neurons who get Pruned with the L1 Norm 
+    
+    Args:
+        layer_params: Stores the current weights of the model
+        prun_layer: Integer of layer number
+        prun_factor: Integer which says how many percent of the dense neurons should be deleted    
+            
+    Return: 
+        prune_neurons: get indizies of neurons to prune
+        num_new_neuron: New shape of the weight Matrix
+    """
     new_layer_param = layer_params[prun_layer]
     avg_neuron_w = []
 
@@ -141,7 +153,20 @@ def get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor):
     num_new_neurons = new_layer_param[0].shape[-1] - len(prun_neurons)
     return prun_neurons,num_new_neurons
 
+
 def get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor):
+    """
+    Calculate the neurons who get Pruned with the L1 Norm 
+    
+    Args:
+        layer_params: Stores the current weights of the model
+        prun_layer: Integer of layer number
+        prun_factor: Integer which says how many percent of the dense neurons should be deleted    
+            
+    Return: 
+        prune_neurons: get indizies of neurons to prune
+        num_new_neuron: New shape of the weight Matrix
+    """    
     new_layer_param = layer_params[prun_layer]
     avg_neuron_w = []
 
