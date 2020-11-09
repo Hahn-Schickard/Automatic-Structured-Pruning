@@ -186,6 +186,7 @@ def get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor):
 
 
 
+
 def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer, prun_factor,metric):
     """
     Deletes neurons from the dense layer. The prun_factor is telling how much percent of the 
@@ -252,9 +253,45 @@ def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer
     
     return new_model_param, num_new_neurons, layer_output_shape
 
+def get_filter_to_prune_avarage(layer_params,prun_layer,prun_factor):
+    'Load the filters of the conv layer and add a array where the' 
+    'absolut average filter values will be stored'
+    filters = layer_params[prun_layer]
+    avg_filter_w = []
+    'Absolute average of the filter values are written into an array'
+    for i in range (0,filters[0].shape[-1]):
+        avg_filter_w.append(np.average(np.abs(filters[0][:,:,:,i])))
 
+    'Absolute average of the filter values are sorted and a percantage of these which is given'
+    'through the prune factor are stored in prune_filters, these filters will be pruned'
+    prun_filter = sorted(range(filters[0].shape[-1]), key=lambda k: avg_filter_w[k])[:int((prun_factor*filters[0].shape[-1])/100)]
+    prun_filter = np.sort(prun_filter)
 
-def prun_filters_conv(layer_names, layer_params, layer_output_shape, prun_layer, prun_factor):
+    'The number of the new filters of the conv layer are stored'
+    num_new_filter = filters[0].shape[-1] - len(prun_filter)
+    return prun_filter,num_new_filter
+    
+def get_filter_to_prune_L2(layer_params,prun_layer,prun_factor):
+    'Load the filters of the conv layer and add a array where the' 
+    'absolut average filter values will be stored'
+    filters = layer_params[prun_layer]
+    avg_filter_w = []
+    'Absolute average of the filter values are written into an array'
+    for i in range (0,filters[0].shape[-1]):
+        avg_filter_w.append(np.average(np.abs(filters[0][:,:,:,i])))
+
+    'Absolute average of the filter values are sorted and a percantage of these which is given'
+    'through the prune factor are stored in prune_filters, these filters will be pruned'
+    prun_filter = sorted(range(filters[0].shape[-1]), key=lambda k: avg_filter_w[k])[:int((prun_factor*filters[0].shape[-1])/100)]
+    prun_filter = np.sort(prun_filter)
+
+    'The number of the new filters of the conv layer are stored'
+    num_new_filter = filters[0].shape[-1] - len(prun_filter)
+    return prun_filter,num_new_filter
+
+    
+
+def prun_filters_conv(layer_names, layer_params, layer_output_shape, prun_layer, prun_factor,metric='L1'):
     """
     Deletes filters from the conv layer. The prun_factor is telling how much percent of the 
     filters of the conv layer should be deleted.
@@ -278,23 +315,13 @@ def prun_filters_conv(layer_names, layer_params, layer_output_shape, prun_layer,
         return None, None
     #print(prun_factor)
     if prun_factor > 0:
-        'Load the filters of the conv layer and add a array where the' 
-        'absolut average filter values will be stored'
-        filters = layer_params[prun_layer]
-        avg_filter_w = []
-
-        'Absolute average of the filter values are written into an array'
-        for i in range (0,filters[0].shape[-1]):
-            avg_filter_w.append(np.average(np.abs(filters[0][:,:,:,i])))
-
-        'Absolute average of the filter values are sorted and a percantage of these which is given'
-        'through the prune factor are stored in prune_filters, these filters will be pruned'
-        prun_filter = sorted(range(filters[0].shape[-1]), key=lambda k: avg_filter_w[k])[:int((prun_factor*filters[0].shape[-1])/100)]
-        prun_filter = np.sort(prun_filter)
-
-        'The number of the new filters of the conv layer are stored'
-        num_new_filter = filters[0].shape[-1] - len(prun_filter)
-
+        if metric is 'L1':
+            prun_filter,num_new_filter=get_filter_to_prune_avarage(layer_params,prun_layer,prun_factor)
+        elif metric is 'L2':
+            prun_filter,num_new_filter=get_filter_to_prune_L2(layer_params,prun_layer,prun_factor)
+        else:
+            prun_filter,num_new_filter=get_filter_to_prune_avarage(layer_params,prun_layer,prun_factor)
+        
         'Deleting the filters, beginning with the filter with the highest index'
         if len(prun_filter) > 0:
             for i in range(len(prun_filter)-1,-1,-1):
@@ -339,7 +366,7 @@ def model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons
             layer_params, num_new_neurons[i], layer_output_shape = prun_neurons_dense(layer_names, layer_params, layer_output_shape, i, prun_factor_dense,metric)
 
         elif "conv" in layer_names[i]:
-            layer_params, num_new_filters[i], layer_output_shape = prun_filters_conv(layer_names, layer_params, layer_output_shape, i, prun_factor_conv)
+            layer_params, num_new_filters[i], layer_output_shape = prun_filters_conv(layer_names, layer_params, layer_output_shape, i, prun_factor_conv,metric)
 
         else:
             ("No pruning for this layer")
