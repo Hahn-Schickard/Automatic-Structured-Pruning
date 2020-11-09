@@ -20,8 +20,9 @@ The framework is still under development and will be extended from time to time.
 - More prune methods not only l1/l2 norm
 - not only Sequential models to prune
 - Resnet support
-- do you have an idea? please write to Marcus.rueb@hahn-schickard.de or create an issue.
 - Train from scratch
+- do you have an idea? please write to Marcus.rueb@hahn-schickard.de or create an issue.
+
 
 
 # How to start?
