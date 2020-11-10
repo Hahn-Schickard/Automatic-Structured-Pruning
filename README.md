@@ -7,7 +7,7 @@ The framework is still under development and will be extended from time to time.
 - Prune of filters / channels
 - Prune of neurons
 - Automatic pruning to minimum accuracy
-- Prune metric: L1/L2 Norm
+- Prune metric: L1/L2 Norm for neuron Pruning
 
 
 
