@@ -19,6 +19,8 @@ def get_layer_shape_dense(new_model_param,layer):
         shape of the current layer	
     """	
     return new_model_param[layer][0].shape[1]	
+
+
 def get_layer_shape_conv(new_model_param,layer):	
     """	
     Gets the struture of the new generated model and return the shape of the current layer	
