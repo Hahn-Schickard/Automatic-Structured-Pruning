@@ -1,3 +1,5 @@
+#PRUNING NEU
+
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import Model
@@ -19,6 +21,8 @@ def get_layer_shape_dense(new_model_param,layer):
         shape of the current layer	
     """	
     return new_model_param[layer][0].shape[1]	
+    
+    
 def get_layer_shape_conv(new_model_param,layer):	
     """	
     Gets the struture of the new generated model and return the shape of the current layer	
@@ -39,38 +43,43 @@ def load_model_param(model):
     Gets layer names, layer weights and output_shape of each layer from the given keras model.
     The weights of all layers are stored in layer_params. This array will be used to delete the neurons and reload
     the weights later
-    The names of all layers are stored in layer_name to search for dense and conv layers.
+    The type of all layers are stored in layer_types to search for dense and conv layers.
     The output shape of each layer is also needed to set the right number of parameters in layers like max_pool
     
     Args: 
         model: Model which should be pruned
             
     Return: 
-        layer_name (np.array): Names of all layers of the model	
+        layer_types (np.array): Type of all layers of the model	
         layer_params (np.array): All weight matrices of the model	
         layer_output_shape (list): Output shape of all layers of the model
     """
     
     layer_params = []
-    layer_names = []
+    layer_types = []
     layer_output_shape = []
+    layer_bias = []
 
     for layer in model.layers:	
-        layer_names.append(layer.name)	
+        layer_types.append(layer.__class__.__name__)	
         layer_params.append(layer.get_weights())	
         layer_output_shape.append(list(layer.output_shape))
+        try:
+            layer_bias.append(layer.use_bias)
+        except:
+            layer_bias.append(None)
         
-    return np.array(layer_names), np.array(layer_params), layer_output_shape
+    return np.array(layer_types), np.array(layer_params), layer_output_shape, layer_bias
 
 
 
-def delete_dense_neuron(new_model_param, layer_name, layer_output_shape, layer, neuron):
+def delete_dense_neuron(new_model_param, layer_types, layer_output_shape, layer_bias, layer, neuron):
     """
     Deletes a given neuron if the layer is a dense layer
     
     Args: 
         new_model_param: Stores the current weights of the model
-        layer_name: If layer_name is dense, neuron will be removed
+        layer_types: If layer_types is dense, neuron will be removed
         layer_output_shape: Stores the current output shapes of all layers of the model
         layer: Integer of layer number (0,1,2, ...)
         neuron: Integer which says which neuron of the given layer (if dense) should be deleted
@@ -81,9 +90,10 @@ def delete_dense_neuron(new_model_param, layer_name, layer_output_shape, layer, 
     """
     
     "If the current layer is a dense layer, weights and the bias are removed for the given layer and neuron"
-    if "dense" in layer_name[layer]:
+    if layer_types[layer] == "Dense":
         new_model_param[layer][0] = np.delete(new_model_param[layer][0], neuron, axis=1)   #weight
-        new_model_param[layer][1] = np.delete(new_model_param[layer][1], neuron, axis=0)   #Bias
+        if layer_bias[layer] == True:
+            new_model_param[layer][1] = np.delete(new_model_param[layer][1], neuron, axis=0)   #Bias
         
         "The new output shape of the layer is restored"
         layer_output_shape[layer][1] = get_layer_shape_dense(new_model_param, layer)
@@ -95,7 +105,7 @@ def delete_dense_neuron(new_model_param, layer_name, layer_output_shape, layer, 
         "the output neurons are the same as those of the current dense layer" 
         
         for i in range(layer+1,len(new_model_param)):
-            if "dense" in layer_name[i]:
+            if layer_types[i] == "Dense":
                 new_model_param[i][0] = np.delete(new_model_param[i][0], neuron, axis=0)   #Parameter müssen auch aus nächster Gewichtsmatrix gelöscht werden
                 return new_model_param, layer_output_shape
             
@@ -109,13 +119,13 @@ def delete_dense_neuron(new_model_param, layer_name, layer_output_shape, layer, 
         
     return new_model_param, layer_output_shape
     
-def delete_filter(new_model_param, layer_name, layer_output_shape, layer, filter):
+def delete_filter(new_model_param, layer_types, layer_output_shape, layer_bias, layer, filter):
     """
     Deletes a given filter if the layer is a conv layer
     
     Args: 
         new_model_param: Stores the current weights of the model
-        layer_name: If layer_name is conv, neuron will be removed
+        layer_types: If layer_types is Conv2D, filter will be removed
         layer_output_shape: Stores the current output shapes of all layers of the model
         layer: Integer of layer number
         filter: Integer which says which filter of the given layer (if conv) should be deleted
@@ -127,9 +137,10 @@ def delete_filter(new_model_param, layer_name, layer_output_shape, layer, filter
     
     
     "If the current layer is a conv layer, weights and the bias are removed for the given layer and filter"
-    if "conv" in layer_name[layer]:
+    if layer_types[layer] == "Conv2D":
         new_model_param[layer][0] = np.delete(new_model_param[layer][0], filter, axis=3)   #Delete Filter
-        new_model_param[layer][1] = np.delete(new_model_param[layer][1], filter, axis=0)   #Delete Bias
+        if layer_bias[layer] == True:
+            new_model_param[layer][1] = np.delete(new_model_param[layer][1], filter, axis=0)   #Delete Bias
         
         
         "The new output shape of the layer is restored"
@@ -139,25 +150,28 @@ def delete_filter(new_model_param, layer_name, layer_output_shape, layer, filter
         "to the removed neuron and also have to be removed"
         for dense_layer in range(layer+1,len(new_model_param)):
             
-            
-            if "conv" in layer_name[denselayer]:
-                new_model_param[dense_layer][0] = np.delete(new_model_param[denselayer][0], filter, axis=2)
+            if layer_types[dense_layer] == "Conv2D":
+                new_model_param[dense_layer][0] = np.delete(new_model_param[dense_layer][0], filter, axis=2)
                 return new_model_param, layer_output_shape
             
             
-            elif "dense" in layer_name[denselayer]:
-                for j in range(0,layer_output_shape[denselayer-2][1]*layer_output_shape[denselayer-2][2]):   #layer before is flatten, we need output shape before layer flatten
+            elif layer_types[dense_layer] == "Dense":
+                print(layer_output_shape[dense_layer-2][1]*layer_output_shape[dense_layer-2][2])
+                print(filter)
+                for j in range(0,layer_output_shape[dense_layer-2][1]*layer_output_shape[dense_layer-2][2]):   #layer before is flatten, we need output shape before layer flatten
                     new_model_param[dense_layer][0] = np.delete(new_model_param[dense_layer][0], filter, axis=0)
                 return new_model_param, layer_output_shape
             
-            elif np.array(new_model_param[denselayer]).size == 0:
-                for next_layer in range(denselayer+1,len(new_model_param)):
-                    if "conv" in layer_name[next_layer]: 
-                        layer_output_shape[denselayer][3] = nget_layer_shape_conv(new_model_param, layer)
-                    elif "flatten" in layer_name[next_layer]:
-                        layer_output_shape[denselayer][3] = get_layer_shape_conv(new_model_param, layer)
-                        #layer_output_shape[next_layer][1] = layer_output_shape[denselayer][1] * layer_output_shape[denselayer][2] * layer_output_shape[denselayer][3]
-                        layer_output_shape[next_layer][1] = np.prod(layer_output_shape[i][1:4])
+            elif np.array(new_model_param[dense_layer]).size == 0:
+                for next_layer in range(dense_layer+1,len(new_model_param)):
+                    if layer_types[next_layer] == "Conv2D": 
+                        layer_output_shape[dense_layer][3] = get_layer_shape_conv(new_model_param, layer)
+                        break
+                    elif "flatten" in layer_types[next_layer]:
+                        layer_output_shape[dense_layer][3] = get_layer_shape_conv(new_model_param, layer)
+                        #layer_output_shape[next_layer][1] = layer_output_shape[dense_layer][1] * layer_output_shape[dense_layer][2] * layer_output_shape[dense_layer][3]
+                        layer_output_shape[next_layer][1] = np.prod(layer_output_shape[dense_layer][1:4])
+                        break
             
     else:
         print("No conv layer")
@@ -229,13 +243,13 @@ def get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor):
 
 
 
-def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer, prun_factor,metric):
+def prun_neurons_dense(layer_types, layer_params, layer_output_shape, layer_bias, prun_layer, prun_factor,metric):
     """
     Deletes neurons from the dense layer. The prun_factor is telling how much percent of the 
     neurons of the dense layer should be deleted.
     
     Args: 
-        layer_names: If layer_name is dense neurons will be removed
+        layer_types: If layer_types is dense neurons will be removed
         layer_params: Stores the current weights of the model
         layer_output_shape: Stores the current output shapes of all layers of the model
         prun_layer: Integer of layer number
@@ -248,7 +262,7 @@ def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer
     """
     
     'Check if layer to prune is a Dense layer'
-    if not "dense" in layer_names[prun_layer]:
+    if layer_types[prun_layer] != "Dense":
         print("No dense layer!")
         return None, None
     
@@ -258,9 +272,9 @@ def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer
         new_layer_param = layer_params[prun_layer]
         avg_neuron_w = []
 
-        if metric is 'L1':
+        if metric == 'L1':
             prun_neurons,num_new_neurons=get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor)
-        elif metric is 'L2':
+        elif metric == 'L2':
             prun_neurons,num_new_neurons=get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor)
         else:
             prun_neurons,num_new_neurons=get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor)
@@ -282,7 +296,7 @@ def prun_neurons_dense(layer_names, layer_params, layer_output_shape, prun_layer
         'Deleting the neurons, beginning with the neuron with the highest index'
         if len(prun_neurons) > 0:
             for i in range(len(prun_neurons)-1,-1,-1):
-                new_model_param, layer_output_shape = delete_dense_neuron(layer_params, layer_names, layer_output_shape, prun_layer, prun_neurons[i])
+                new_model_param, layer_output_shape = delete_dense_neuron(layer_params, layer_types, layer_output_shape, layer_bias, prun_layer, prun_neurons[i])
 
         else:
             new_model_param = layer_params
@@ -333,13 +347,13 @@ def get_filter_to_prune_L2(layer_params,prun_layer,prun_factor):
 
     
 
-def prun_filters_conv(layer_names, layer_params, layer_output_shape, prun_layer, prun_factor,metric='L1'):
+def prun_filters_conv(layer_types, layer_params, layer_output_shape, layer_bias, prun_layer, prun_factor,metric='L1'):
     """
     Deletes filters from the conv layer. The prun_factor is telling how much percent of the 
     filters of the conv layer should be deleted.
     
     Args: 
-        layer_names: If layer_name is conv, filters will be removed
+        layer_types: If layer_types is Conv2D, filters will be removed
         layer_params: Stores the current weights of the model
         layer_output_shape: Stores the current output shapes of all layers of the model
         prun_layer: Integer of layer number
@@ -352,14 +366,14 @@ def prun_filters_conv(layer_names, layer_params, layer_output_shape, prun_layer,
     """
     
     'Check if layer to prune is a Conv layer'
-    if not "conv" in layer_names[prun_layer]:
+    if layer_types[prun_layer] != "Conv2D":
         print("No Conv layer!")
         return None, None
     #print(prun_factor)
     if prun_factor > 0:
-        if metric is 'L1':
+        if metric == 'L1':
             prun_filter,num_new_filter=get_filter_to_prune_avarage(layer_params,prun_layer,prun_factor)
-        elif metric is 'L2':
+        elif metric == 'L2':
             prun_filter,num_new_filter=get_filter_to_prune_L2(layer_params,prun_layer,prun_factor)
         else:
             prun_filter,num_new_filter=get_filter_to_prune_avarage(layer_params,prun_layer,prun_factor)
@@ -367,7 +381,7 @@ def prun_filters_conv(layer_names, layer_params, layer_output_shape, prun_layer,
         'Deleting the filters, beginning with the filter with the highest index'
         if len(prun_filter) > 0:
             for i in range(len(prun_filter)-1,-1,-1):
-                new_model_param, layer_output_shape = delete_filter(layer_params, layer_names, layer_output_shape, prun_layer, prun_filter[i])
+                new_model_param, layer_output_shape = delete_filter(layer_params, layer_types, layer_output_shape, layer_bias, prun_layer, prun_filter[i])
 
         else:
             new_model_param = layer_params
@@ -382,13 +396,13 @@ def prun_filters_conv(layer_names, layer_params, layer_output_shape, prun_layer,
 
 
 
-def model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric):
+def model_pruning(layer_types, layer_params, layer_output_shape, layer_bias, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric):
     """
     Deletes neurons and filters from all dense and conv layers. The two prunfactors are 
     telling how much percent of the neurons and the filters should be deleted.
     
     Args: 
-        layer_names: The names of all layers of the model
+        layer_types: The types of all layers of the model
         layer_params: Stores the current weights of the model
         layer_output_shape: Stores the current output shapes of all layers of the model
         num_new_neurons: Number of neurons of the dense layers
@@ -404,11 +418,11 @@ def model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons
     """
     
     for i in range(0,len(layer_params)-2):
-        if "dense" in layer_names[i]:
-            layer_params, num_new_neurons[i], layer_output_shape = prun_neurons_dense(layer_names, layer_params, layer_output_shape, i, prun_factor_dense,metric)
+        if layer_types[i] == "Dense":
+            layer_params, num_new_neurons[i], layer_output_shape = prun_neurons_dense(layer_types, layer_params, layer_output_shape, layer_bias, i, prun_factor_dense,metric)
 
-        elif "conv" in layer_names[i]:
-            layer_params, num_new_filters[i], layer_output_shape = prun_filters_conv(layer_names, layer_params, layer_output_shape, i, prun_factor_conv,metric)
+        elif layer_types[i] == "Conv2D":
+            layer_params, num_new_filters[i], layer_output_shape = prun_filters_conv(layer_types, layer_params, layer_output_shape, layer_bias, i, prun_factor_conv,metric)
 
         else:
             ("No pruning for this layer")
@@ -417,7 +431,7 @@ def model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons
 
 
 
-def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neurons, num_new_filters,comp):
+def build_pruned_model(pruned_model, new_model_param, layer_types, num_new_neurons, num_new_filters,comp):
     """
     The new number of neurons and filters are changed in the model config.
     Load the new weight matrices into the model.
@@ -425,7 +439,7 @@ def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neuro
     Args: 
         pruned_model: Model which should be pruned
         new_model_param: Stores the new weights of the model
-        layer_names: The names of all layers of the model
+        layer_types: The types of all layers of the model
         num_new_neurons: Number of neurons of the dense layers
         num_new_filters: Number of filters of the conv layers
         
@@ -437,10 +451,12 @@ def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neuro
 
     print(num_new_neurons)
     for i in range(0,len(model_config['layers'])-3):
-        if "dense" in model_config['layers'][i+1]['config']['name']:
+        if model_config['layers'][i+1]['class_name'] == "Dense":
+            print("Dense")
             model_config['layers'][i+1]['config']['units'] = num_new_neurons[i]
 
-        elif "conv" in model_config['layers'][i+1]['config']['name']:
+        elif model_config['layers'][i+1]['class_name'] == "Conv2D":
+            print("Conv")
             model_config['layers'][i+1]['config']['filters'] = num_new_filters[i]
 
         else:
@@ -458,7 +474,7 @@ def build_pruned_model(pruned_model, new_model_param, layer_names, num_new_neuro
     
     
     for i in range(0,len(pruned_model.layers)):
-        if 'conv' in layer_names[i] or 'dense' in layer_names[i]:
+        if layer_types[i] == 'Conv2D' or layer_types[i] == 'Dense':
             pruned_model.layers[i].set_weights(new_model_param[i])
     
     return pruned_model
@@ -490,15 +506,15 @@ def pruning(keras_model, x_train, y_train,comp,fit, prun_factor_dense=10, prun_f
         print("No model given to prune")
     
     
-    layer_names, layer_params, layer_output_shape = load_model_param(model)
+    layer_types, layer_params, layer_output_shape, layer_bias = load_model_param(model)
     num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
     num_new_filters = np.zeros(shape=len(layer_params), dtype=np.int16)
 
-    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric)
+    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(layer_types, layer_params, layer_output_shape, layer_bias, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric)
 
     print("Finish with pruning")
 
-    pruned_model = build_pruned_model(model, layer_params, layer_names, num_new_neurons, num_new_filters,comp)
+    pruned_model = build_pruned_model(model, layer_params, layer_types, num_new_neurons, num_new_filters,comp)
 
     #earlystopper = EarlyStopping(monitor='val_accuracy', min_delta= 1e-3, mode='min', verbose=1, patience=5, restore_best_weights=True)
     history = pruned_model.fit(x_train, y_train, **fit)
@@ -573,20 +589,20 @@ def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10,metric='L
         print("No model given to prune")
 
     if comp is None:
-      comp = {
+        comp = {
         "optimizer": 'adam',
         "loss": tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         "metrics": 'accuracy'}    
     
     
-    layer_names, layer_params, layer_output_shape = load_model_param(model)
+    layer_types, layer_params, layer_output_shape, layer_bias = load_model_param(model)
     num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
     num_new_filters = np.zeros(shape=len(layer_params), dtype=np.int16)
 
-    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(layer_names, layer_params, layer_output_shape, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric)
+    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(layer_types, layer_params, layer_output_shape, layer_bias, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric)
 
     print("Finish with pruning")
 
-    pruned_model = build_pruned_model(model, layer_params, layer_names, num_new_neurons, num_new_filters,comp)
+    pruned_model = build_pruned_model(model, layer_params, layer_types, num_new_neurons, num_new_filters,comp)
     
     return pruned_model
