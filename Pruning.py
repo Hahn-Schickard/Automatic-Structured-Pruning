@@ -9,7 +9,7 @@ from keras.callbacks import EarlyStopping
 import tensorflow as tf
 
 
-def get_layer_shape_dense(new_model_param,layer):	
+def get_layer_shape_dense(new_model_param, layer):	
     """	
     Gets the struture of the new generated model and return the shape of the current layer	
     	
@@ -28,7 +28,7 @@ def get_layer_shape_dense(new_model_param,layer):
 
 
 >>>>>>> 325ccdefb626b3b0b18ba1f224b8de74d8b13ca9
-def get_layer_shape_conv(new_model_param,layer):	
+def get_layer_shape_conv(new_model_param, layer):	
     """	
     Gets the struture of the new generated model and return the shape of the current layer	
     	
@@ -86,6 +86,7 @@ def delete_dense_neuron(new_model_param, layer_types, layer_output_shape, layer_
         new_model_param: Stores the current weights of the model
         layer_types: If layer_types is dense, neuron will be removed
         layer_output_shape: Stores the current output shapes of all layers of the model
+        layer_bias: Stores the current output shapes of all biases of the model
         layer: Integer of layer number (0,1,2, ...)
         neuron: Integer which says which neuron of the given layer (if dense) should be deleted
             
@@ -132,6 +133,7 @@ def delete_filter(new_model_param, layer_types, layer_output_shape, layer_bias, 
         new_model_param: Stores the current weights of the model
         layer_types: If layer_types is Conv2D, filter will be removed
         layer_output_shape: Stores the current output shapes of all layers of the model
+        layer_bias: Stores the current output shapes of all biases of the model        
         layer: Integer of layer number
         filter: Integer which says which filter of the given layer (if conv) should be deleted
             
@@ -184,7 +186,7 @@ def delete_filter(new_model_param, layer_types, layer_output_shape, layer_bias, 
     return new_model_param, layer_output_shape
 
 
-def get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor):
+def get_neuros_to_prune_l1(layer_params, prun_layer, prun_factor):
     """
     Calculate the neurons who get Pruned with the L1 Norm 
     
@@ -215,7 +217,7 @@ def get_neuros_to_prune_l1(layer_params,prun_layer,prun_factor):
     return prun_neurons,num_new_neurons
 
 
-def get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor):
+def get_neuros_to_prune_l2(layer_params, prun_layer, prun_factor):
     """
     Calculate the neurons who get Pruned with the L1 Norm 
     
@@ -248,7 +250,7 @@ def get_neuros_to_prune_l2(layer_params,prun_layer,prun_factor):
 
 
 
-def prun_neurons_dense(layer_types, layer_params, layer_output_shape, layer_bias, prun_layer, prun_factor,metric):
+def prun_neurons_dense(layer_types, layer_params, layer_output_shape, layer_bias, prun_layer, prun_factor, metric):
     """
     Deletes neurons from the dense layer. The prun_factor is telling how much percent of the 
     neurons of the dense layer should be deleted.
@@ -257,8 +259,10 @@ def prun_neurons_dense(layer_types, layer_params, layer_output_shape, layer_bias
         layer_types: If layer_types is dense neurons will be removed
         layer_params: Stores the current weights of the model
         layer_output_shape: Stores the current output shapes of all layers of the model
+        layer_bias: Stores the current output shapes of all biases of the model
         prun_layer: Integer of layer number
         prun_factor: Integer which says how many percent of the dense neurons should be deleted
+        metric: String (either 'L1' or 'L2') defining the pruning metric to apply
         
     Return: 
         new_model_param: New model params after deleting the neurons
@@ -314,7 +318,7 @@ def prun_neurons_dense(layer_types, layer_params, layer_output_shape, layer_bias
     
     return new_model_param, num_new_neurons, layer_output_shape
 
-def get_filter_to_prune_avarage(layer_params,prun_layer,prun_factor):
+def get_filter_to_prune_avarage(layer_params, prun_layer, prun_factor):
     'Load the filters of the conv layer and add a array where the' 
     'absolut average filter values will be stored'
     filters = layer_params[prun_layer]
@@ -332,7 +336,7 @@ def get_filter_to_prune_avarage(layer_params,prun_layer,prun_factor):
     num_new_filter = filters[0].shape[-1] - len(prun_filter)
     return prun_filter,num_new_filter
     
-def get_filter_to_prune_L2(layer_params,prun_layer,prun_factor):
+def get_filter_to_prune_L2(layer_params, prun_layer, prun_factor):
     'Load the filters of the conv layer and add a array where the' 
     'absolut average filter values will be stored'
     filters = layer_params[prun_layer]
@@ -352,7 +356,7 @@ def get_filter_to_prune_L2(layer_params,prun_layer,prun_factor):
 
     
 
-def prun_filters_conv(layer_types, layer_params, layer_output_shape, layer_bias, prun_layer, prun_factor,metric='L1'):
+def prun_filters_conv(layer_types, layer_params, layer_output_shape, layer_bias, prun_layer, prun_factor, metric='L1'):
     """
     Deletes filters from the conv layer. The prun_factor is telling how much percent of the 
     filters of the conv layer should be deleted.
@@ -361,8 +365,10 @@ def prun_filters_conv(layer_types, layer_params, layer_output_shape, layer_bias,
         layer_types: If layer_types is Conv2D, filters will be removed
         layer_params: Stores the current weights of the model
         layer_output_shape: Stores the current output shapes of all layers of the model
+        layer_bias: Stores the current output shapes of all biases of the model
         prun_layer: Integer of layer number
         prun_factor: Integer which says how many percent of the filters should be deleted
+        metric: String (either 'L1' or 'L2') defining the pruning metric to apply        
         
     Return: 
         new_model_param: New model params after deleting the filters
@@ -401,7 +407,7 @@ def prun_filters_conv(layer_types, layer_params, layer_output_shape, layer_bias,
 
 
 
-def model_pruning(layer_types, layer_params, layer_output_shape, layer_bias, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv,metric):
+def model_pruning(layer_types, layer_params, layer_output_shape, layer_bias, num_new_neurons, num_new_filters, prun_factor_dense, prun_factor_conv, metric):
     """
     Deletes neurons and filters from all dense and conv layers. The two prunfactors are 
     telling how much percent of the neurons and the filters should be deleted.
@@ -410,11 +416,13 @@ def model_pruning(layer_types, layer_params, layer_output_shape, layer_bias, num
         layer_types: The types of all layers of the model
         layer_params: Stores the current weights of the model
         layer_output_shape: Stores the current output shapes of all layers of the model
+        layer_bias: Stores the current output shapes of all biases of the model        
         num_new_neurons: Number of neurons of the dense layers
         num_new_filters: Number of filters of the conv layers
         prun_factor_dense: Integer which says how many percent of the neurons should be deleted
         prun_factor_conv: Integer which says how many percent of the filters should be deleted
-        
+        metric: String (either 'L1' or 'L2') defining the pruning metric to apply 
+                
     Return: 
         layer_params: New model params after deleting the neurons and filters
         num_new_neurons: New number of filters of the dense layers
@@ -436,7 +444,7 @@ def model_pruning(layer_types, layer_params, layer_output_shape, layer_bias, num
 
 
 
-def build_pruned_model(pruned_model, new_model_param, layer_types, num_new_neurons, num_new_filters,comp):
+def build_pruned_model(pruned_model, new_model_param, layer_types, num_new_neurons, num_new_filters, comp):
     """
     The new number of neurons and filters are changed in the model config.
     Load the new weight matrices into the model.
@@ -447,6 +455,7 @@ def build_pruned_model(pruned_model, new_model_param, layer_types, num_new_neuro
         layer_types: The types of all layers of the model
         num_new_neurons: Number of neurons of the dense layers
         num_new_filters: Number of filters of the conv layers
+        comp: Compile configuration for the pruned model
         
     Return: 
         pruned_model: New model after pruning all dense and conv layers
@@ -486,7 +495,7 @@ def build_pruned_model(pruned_model, new_model_param, layer_types, num_new_neuro
 
 
 
-def pruning(keras_model, x_train, y_train,comp,fit, prun_factor_dense=10, prun_factor_conv=10,metric='L1'):
+def pruning(keras_model, x_train, y_train, comp, fit, prun_factor_dense=10, prun_factor_conv=10, metric='L1'):
     """
     A given keras model get pruned. The factor for dense and conv says how many percent
     of the dense and conv layers should be deleted. After pruning the model will be
@@ -496,8 +505,11 @@ def pruning(keras_model, x_train, y_train,comp,fit, prun_factor_dense=10, prun_f
         keras_model: Model which should be pruned
         x_train: Training data to retrain the model after pruning
         y_train: Labels of training data to retrain the model after pruning
+        comp: Compile configuration for the pruned model
+        fit: Training configuration for the pruned model    
         prun_factor_dense: Integer which says how many percent of the neurons should be deleted
         prun_factor_conv: Integer which says how many percent of the filters should be deleted
+        metric: String (either 'L1' or 'L2') defining the pruning metric to apply         
         
     Return: 
         pruned_model: New model after pruning and retraining
@@ -527,7 +539,7 @@ def pruning(keras_model, x_train, y_train,comp,fit, prun_factor_dense=10, prun_f
     return pruned_model
 
 
-def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, comp,fit ,pruning_acc=None, max_acc_loss=1):
+def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, comp, fit, pruning_acc=None, max_acc_loss=1):
     """
     A given keras model gets pruned. Either an accuracy value (in %) can be specified, which 
     the minimized model must still achieve. Or the maximum loss of accuracy (in %) that 
@@ -540,6 +552,8 @@ def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, comp,fit ,pru
         y_train: Labels of training data to retrain the model after pruning
         x_test: Test data for evaluation of the minimized model
         y_test: Labels of test data for evaluation of the minimized model
+        comp: Compile configuration for the pruned model
+        fit: Training configuration for the pruned model           
         pruning_acc: Integer which says which accuracy value (in %) should not be fall below. If pruning_acc is not defined, it is Baseline - 5%
         max_acc_loss: Integer which says which accuracy loss (in %) should not be exceed 
         
@@ -571,7 +585,7 @@ def pruning_for_acc(keras_model, x_train, y_train, x_test, y_test, comp,fit ,pru
     return pruned_model
     
     
-def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10,metric='L1',comp=None):
+def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10, metric='L1', comp=None):
     """
     A given keras model get pruned. The factor for dense and conv says how many percent
     of the dense and conv layers should be deleted. After pruning the model will be
@@ -581,6 +595,8 @@ def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10,metric='L
         keras_model: Model which should be pruned
         prun_factor_dense: Integer which says how many percent of the neurons should be deleted
         prun_factor_conv: Integer which says how many percent of the filters should be deleted
+        metric: String (either 'L1' or 'L2') defining the pruning metric to apply         
+        comp: Compile configuration for the pruned model       
         
     Return: 
         pruned_model: New model after pruning 
