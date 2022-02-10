@@ -12,9 +12,28 @@ from tensorflow.keras.callbacks import EarlyStopping
 import tensorflow as tf
 import os
 
-from src.GUIEvents._Helper import ThresholdCallback
+
+class ThresholdCallback(tf.keras.callbacks.Callback):
+    """Custom callback for model training.
+
+    This is a custom callback function. You can define an accuracy threshold
+    value when the model training should be stopped.
+
+    Attributes:
+        threshold: Accuracy value to stop training.
+    """
+
+    def __init__(self, threshold):
+        super(ThresholdCallback, self).__init__()
+        self.threshold = threshold
+
+    def on_epoch_end(self, epoch, logs=None): 
+        val_acc = logs["val_accuracy"]        
+        if val_acc >= self.threshold:
+            self.model.stop_training = True
 
 
+            
 def get_layer_shape_dense(new_model_param,layer):	
     """	
     Gets the struture of the new generated model and return the shape of the current layer	
