@@ -12,9 +12,8 @@ The framework is still under development and will be extended from time to time.
 
 
 # Restrictions:
-- There are only SequentialModels Pruneable
-- Tensorflow 2.1 to 2.3.1 is supported
-- it only supports magnitude-based pruning
+- The tool is tested with Tensorflow 2.5
+- It only supports magnitude-based pruning
 
 
 # Upcoming functions:
@@ -22,7 +21,7 @@ The framework is still under development and will be extended from time to time.
 - not only Sequential models to prune
 - Resnet support
 - Train from scratch
-- do you have an idea? please write to Marcus.rueb@hahn-schickard.de or create an issue.
+- Do you have an new idea? Please write to Marcus.rueb@hahn-schickard.de or create an issue.
 
 
 
