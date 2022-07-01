@@ -6,7 +6,7 @@
    SPDX-License-Identifier: Apache-2.0
 ============================================================================'''
 
-import os
+import os, copy
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
@@ -19,9 +19,6 @@ from typing import NamedTuple
 class NetStructure(NamedTuple):
     parents: list
     children: list
-    is_merge: bool
-    is_split: bool
-    is_last_conv_before_split_or_merge: bool
 
 class ThresholdCallback(tf.keras.callbacks.Callback):
     """Custom callback for model training.
@@ -121,11 +118,11 @@ def load_model_param(model):
         layer_params:       All weight matrices of the model
         layer_output_shape: Output shape of all layers of the model
         layer_bias:         Bool list if layers contain bias or not
+        network_structure:  NetStructure containing information about parent and child nodes
     """
     layer_params = []
     layer_types = []
     layer_names = []
-    layer_parent_names = []
     layer_parent_idx = []
     layer_output_shape = []
     layer_bias = []
@@ -136,7 +133,6 @@ def load_model_param(model):
 
     for idx, layer in enumerate(model.layers):
         layer_types.append(layer.__class__.__name__)
-        layer_names.append(layer.name)
         layers_dict[layer.name] = idx
         layer_params.append(layer.get_weights())
         layer_output_shape.append(list(layer.output_shape))
@@ -156,12 +152,10 @@ def load_model_param(model):
                     temp_name = model_config['layers'][idx]['inbound_nodes'][0][p_idx][0]
                     parents.append(temp_name)
                     parents_idx.append(layers_dict[temp_name])
-                layer_parent_names.append(parents)
                 layer_parent_idx.append(parents_idx)
             else:
                 layer_parent_idx.append([idx-1])
         else:
-            layer_parent_names.append([])
             layer_parent_idx.append([])
 
     # create child index
@@ -170,37 +164,17 @@ def load_model_param(model):
         for x in parents:
             layer_child_idx[x].append(idx)
 
-    # check for branches
-    is_merge_layer = [False for i in range(len(layer_parent_idx))]
-    is_split_layer = [False for i in range(len(layer_parent_idx))]
-    is_last_conv_before_split_or_merge = [False for i in range(len(layer_parent_idx))]
-    last_conv_idx = -1
-    for idx in range(len(layer_parent_idx)):
-        parents = layer_parent_idx[idx]
-        if layer_types[idx] == "Conv2D":
-            last_conv_idx = idx
-        if len(parents) > 1:
-            is_merge_layer[idx] = True
-            is_last_conv_before_split_or_merge[last_conv_idx] = True
-        children = layer_child_idx[idx]
-        if len(children) > 1:
-            is_split_layer[idx] = True
-            is_last_conv_before_split_or_merge[last_conv_idx] = True
-
     # combine all of it nicely
     network_structure = []
     for idx in range(len(layer_parent_idx)):
         item = NetStructure(
             layer_parent_idx[idx],
-            layer_child_idx[idx],
-            is_merge_layer[idx],
-            is_split_layer[idx],
-            is_last_conv_before_split_or_merge[idx]
+            layer_child_idx[idx]
         )
         network_structure.append(item)
 
     return np.array(layer_types), np.array(layer_params), \
-           layer_output_shape, layer_bias, layer_names, network_structure
+           layer_output_shape, layer_bias, network_structure
 
 
 def delete_dense_neuron(new_model_param, layer_types, layer_output_shape,
@@ -265,7 +239,7 @@ def delete_dense_neuron(new_model_param, layer_types, layer_output_shape,
 
 
 def delete_filter(new_model_param, layer_types, layer_output_shape,
-                  layer_bias, layer, netstr, filter):
+                  layer_bias, layer, netstr, filter, collected_indices):
     """
     Deletes a given filter if the layer is a conv layer.
 
@@ -286,7 +260,7 @@ def delete_filter(new_model_param, layer_types, layer_output_shape,
     '''Don't change filters of output layers'''
     if len(netstr[layer].children) == 0:  # output conv layers don't have child nodes
         print("Skipping output conv layer")
-        return new_model_param, layer_output_shape
+        return new_model_param, layer_output_shape, collected_indices
 
     '''If the current layer is a conv layer, weights and the bias are removed
        for the given layer and filter'''
@@ -309,14 +283,12 @@ def delete_filter(new_model_param, layer_types, layer_output_shape,
             next_layer = netstr[layer].children[0]
         else:
             print("Something is wrong: non-output conv layer should have exactly 1 child!")
-            return new_model_param, layer_output_shape
-            #exit(1)
+            return new_model_param, layer_output_shape, collected_indices
 
         # contains all branches that need processing as tuples (start_node, parent_node, child_node)
         branches_to_process = []
         for ch in netstr[next_layer].children:
             branches_to_process.append([next_layer, layer, ch])
-
 
         while len(branches_to_process) != 0: # TODO replace by queue
             next_branch = branches_to_process[0]
@@ -326,41 +298,43 @@ def delete_filter(new_model_param, layer_types, layer_output_shape,
             current_layer_idx = next_branch[0]
             parent_idx = next_branch[1]
             child_idx = next_branch[2]
+            channel_offset = 0  # used to correct filter index after concatenation layers
 
             while not terminated:
                 if len(new_model_param[current_layer_idx]) != 0:
                     if layer_types[current_layer_idx] == "Dense":
                         new_model_param[current_layer_idx][0] = np.delete(new_model_param[current_layer_idx][0], filter,axis=0)
-                        terminated = True # return new_model_param, layer_output_shape
+                        terminated = True
                     if layer_bias[current_layer_idx] is None:
                         for i in range(0, len(new_model_param[current_layer_idx])):
                             new_model_param[current_layer_idx][i] = np.delete(new_model_param[current_layer_idx][i], filter,axis=0)
                         layer_output_shape[current_layer_idx][3] = get_layer_shape_conv(new_model_param, layer)
                     else:
                         if layer_types[current_layer_idx] == "Conv2D":
-                            # TODO: first conv layer after an "add" layer causes problems because both branches
-                            #   that are added want to remove different filters
-                            new_model_param[current_layer_idx][0] = np.delete(new_model_param[current_layer_idx][0],
-                                                                                  filter, axis=2)
-                            if child_idx != -1 and not netstr[current_layer_idx].is_last_conv_before_split_or_merge:
-                                layer_output_shape[current_layer_idx][3] = get_layer_shape_conv(new_model_param, layer)
-                            terminated = True # return new_model_param, layer_output_shape
+                            # NOTE: do not remove filters, just collect their indices
+                            if current_layer_idx not in collected_indices:
+                               collected_indices[current_layer_idx] = [filter + channel_offset]
+                            else:
+                               collected_indices[current_layer_idx].append(filter + channel_offset)
+                            terminated = True
                         else:
                             new_model_param[current_layer_idx][0] = np.delete(new_model_param[current_layer_idx][0],
                                                                               filter, axis=2)
                             layer_output_shape[current_layer_idx][3] = get_layer_shape_conv(new_model_param, layer)
                 else:
                     if layer_types[current_layer_idx] == "Dense":
-                        terminated = True # break
+                        terminated = True # this case should never happen: dense layers have params
                     elif layer_types[current_layer_idx] == "Flatten":
                         layer_output_shape[current_layer_idx][1] = np.prod(layer_output_shape[parent_idx][1:4])
                         for i in range(np.multiply(np.prod(layer_output_shape[parent_idx][1:3]), filter - 1),
                                        np.multiply(np.prod(layer_output_shape[parent_idx][1:3]), filter)):
                             new_model_param[child_idx][0] = np.delete(new_model_param[child_idx][0], i, axis=0)
-                        terminated = True # break
+                        terminated = True
                     elif layer_types[current_layer_idx] == "Concatenate":
                         channel_sum = 0
                         for cp_idx in netstr[current_layer_idx].parents:
+                            if cp_idx == parent_idx:
+                                channel_offset = channel_sum
                             channel_sum += layer_output_shape[cp_idx][3]
                         layer_output_shape[current_layer_idx][3] = channel_sum
                     else:
@@ -370,7 +344,7 @@ def delete_filter(new_model_param, layer_types, layer_output_shape,
                             layer_output_shape[current_layer_idx][1] = (get_layer_shape_conv(new_model_param, layer))
 
                 # update values for next step
-                if child_idx == -1: # we have processed the last output layer
+                if child_idx == -1:  # we have processed the last output layer
                     terminated = True
                 else:
                     parent_idx = current_layer_idx
@@ -387,7 +361,7 @@ def delete_filter(new_model_param, layer_types, layer_output_shape,
     else:
         print("No conv layer")
 
-    return new_model_param, layer_output_shape
+    return new_model_param, layer_output_shape, collected_indices
 
 
 def get_neurons_to_prune_l1(layer_params, prun_layer, prun_factor):
@@ -593,7 +567,7 @@ def get_filter_to_prune_l2(layer_params, prun_layer, prun_factor):
 
 
 def prun_filters_conv(layer_types, layer_params, layer_output_shape,
-                      layer_bias, prun_layer, netstr, prun_factor,
+                      layer_bias, prun_layer, netstr, prun_factor, collected_indices,
                       metric='L1'):
     """
     Deletes filters from the conv layer. The prun_factor is telling how much
@@ -618,10 +592,9 @@ def prun_filters_conv(layer_types, layer_params, layer_output_shape,
     if layer_types[prun_layer] != "Conv2D":
         print("No Conv layer!")
         return None, None
-    # TODO: second condition is temporarily used as long as skip connections can not be pruned
-    # third condition prevents pruning output layers with parameters
-    if prun_factor > 0 and not netstr[prun_layer].is_last_conv_before_split_or_merge\
-            and len(netstr[prun_layer].children) > 0:
+
+    # second condition prevents pruning output layers with parameters
+    if prun_factor > 0 and len(netstr[prun_layer].children) > 0:
         if metric == 'L1':
             prun_filter, num_new_filter = get_filter_to_prune_avarage(
                 layer_params, prun_layer, prun_factor)
@@ -636,20 +609,21 @@ def prun_filters_conv(layer_types, layer_params, layer_output_shape,
            index"""
         if len(prun_filter) > 0:
             for i in range(len(prun_filter) - 1, -1, -1):
-                new_model_param, layer_output_shape = delete_filter(
+                new_model_param, layer_output_shape, collected_indices = delete_filter(
                     layer_params, layer_types, layer_output_shape,
-                    layer_bias, prun_layer, netstr, prun_filter[i])
-
+                    layer_bias, prun_layer, netstr, prun_filter[i], collected_indices)
+            # NOTE here layer_output_shape is correct, but new_model_param has the old shape (input dimension is wrong)
         else:
             new_model_param = layer_params
+            num_new_filter = layer_params[prun_layer][0].shape[-1]
             print("No filter to prune increase prune factor for conv layers")
 
     else:
         new_model_param = layer_params
         num_new_filter = layer_params[prun_layer][0].shape[-1]
-        print(f"No pruning implemented for last conv layers before branching, skipping layer index {prun_layer}")
+        collected_indices = collected_indices
 
-    return new_model_param, num_new_filter, layer_output_shape
+    return new_model_param, num_new_filter, layer_output_shape, collected_indices
 
 
 def model_pruning(layer_types, layer_params, layer_output_shape, layer_bias,
@@ -684,6 +658,9 @@ def model_pruning(layer_types, layer_params, layer_output_shape, layer_bias,
                             neurons and filters
     """
 
+    collected_indices = dict()
+    original_layer_output_shape = copy.deepcopy(layer_output_shape)
+
     for i in range(0, get_last_layer_with_params(layer_params)):
         if layer_types[i] == "Dense":
             layer_params, num_new_neurons[i], layer_output_shape = (
@@ -692,14 +669,27 @@ def model_pruning(layer_types, layer_params, layer_output_shape, layer_bias,
                                    netstr,
                                    prun_factor_dense, metric))
         elif layer_types[i] == "Conv2D":
-            layer_params, num_new_filters[i], layer_output_shape = (
+            layer_params, num_new_filters[i], layer_output_shape, collected_indices = (
                 prun_filters_conv(layer_types, layer_params,
                                   layer_output_shape, layer_bias, i,
                                   netstr,
-                                  prun_factor_conv, metric))
-
+                                  prun_factor_conv, collected_indices, metric))
         else:
             ("No pruning for this layer")
+
+    for key, val in collected_indices.items():
+        num_orig_input_filters = original_layer_output_shape[netstr[key].parents[0]][3]
+        num_new_input_filters = layer_output_shape[netstr[key].parents[0]][3]
+        num_filters_to_delete = num_orig_input_filters - num_new_input_filters
+        # TODO make this smarter: instead of taking the front of the list, first
+        #      take all indices that appear multiple times in the list
+        indices_to_delete = list(set(val))[:num_filters_to_delete]
+        indices_to_delete = sorted(indices_to_delete, reverse=True)
+
+        for del_filter_idx in indices_to_delete:
+            layer_params[key][0] = np.delete(layer_params[key][0], del_filter_idx, axis=2)
+            layer_output_shape[key][3] = layer_output_shape[netstr[key].parents[0]][3]
+    del collected_indices
 
     return layer_params, num_new_neurons, num_new_filters, layer_output_shape
 
@@ -757,7 +747,8 @@ def build_pruned_model(model, new_model_param, layer_types, num_new_neurons,
             model_config['layers'][i + fl]['config']['target_shape'] = (
                 temp_tuple)
         else:
-            print("No Dense or Conv2D")
+            pass
+            #print("No Dense or Conv2D")
 
     print("Before pruning:")
     model.summary()
@@ -810,7 +801,7 @@ def pruning(keras_model, x_train, y_train, comp, fit, prun_factor_dense=10,
     else:
         print("No model given to prune")
 
-    layer_types, layer_params, layer_output_shape, layer_bias, layer_names, netstr = (
+    layer_types, layer_params, layer_output_shape, layer_bias, netstr = (
         load_model_param(model))
     num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
     num_new_filters = np.zeros(shape=len(layer_params), dtype=np.int16)
@@ -1051,7 +1042,7 @@ def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10,
                 "loss": tf.keras.losses.SparseCategoricalCrossentropy(),
                 "metrics": 'accuracy'}
 
-    layer_types, layer_params, layer_output_shape, layer_bias, layer_names, netstr = (
+    layer_types, layer_params, layer_output_shape, layer_bias, netstr = (
         load_model_param(model))
     num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
     num_new_filters = np.zeros(shape=len(layer_params), dtype=np.int16)
