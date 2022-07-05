@@ -29,3 +29,6 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -r "requirements.txt"
+    - name: Run test script
+      run: |
+        python test.py
