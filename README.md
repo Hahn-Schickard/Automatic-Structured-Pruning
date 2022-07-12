@@ -32,5 +32,5 @@ Additionally, the Automatic-Structured-Pruning is part of the Tool [AutoFlow](ht
 
 
 # How to start?
-To make it easier to get started with the framework we have created a notebook which helps you to use the functions directly.
-You can open the notebook in Google Colab.
+To make it easier to get started with the framework we have created a [notebook](https://github.com/Hahn-Schickard/Automatic-Structured-Pruning/examples/How_to_use_the_Framework.ipynb) which helps you to use the functions directly.
+You can open the notebook in [Google Colab](https://colab.research.google.com/github/Hahn-Schickard/Automatic-Structured-Pruning/blob/master/examples/How_to_use_the_Framework.ipynb).

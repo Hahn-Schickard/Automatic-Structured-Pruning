@@ -1,3 +1,8 @@
+import os
+import sys
+currentdir = os.path.dirname(os.path.realpath(__file__))
+parentdir = os.path.dirname(currentdir)
+sys.path.append(parentdir)
 import pruning
 import tensorflow as tf
 from tensorflow.keras import datasets, layers, models
@@ -34,15 +39,16 @@ comp = {
 model.compile(**comp)
 callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)]
 
-model.fit(train_images, train_labels, validation_split=0.2, epochs=30, batch_size=128, callbacks=callbacks)
+model.fit(train_images, train_labels, validation_split=0.2, epochs=10, batch_size=128, callbacks=callbacks)
 
-test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=2)
+model_test_loss, model_test_acc = model.evaluate(test_images, test_labels, verbose=2)
+print(f"Model accuracy after Training: {model_test_acc*100:.2f}%")
 
 
 print("\nTest factor pruning")
 dense_prune_rate=30
 conv_prune_rate=40
-prunemodel=pruning.prune_model(model, dense_prune_rate, conv_prune_rate,'L2', num_classes=10)
+pruned_model=pruning.prune_model(model, dense_prune_rate, conv_prune_rate,'L2', num_classes=10)
 
 
 print("\nCompile, retrain and evaluate pruned model")
@@ -51,18 +57,20 @@ comp = {
 "loss": tf.keras.losses.SparseCategoricalCrossentropy(),
 "metrics": ['accuracy']}
 
-prunemodel.compile(**comp)
+pruned_model.compile(**comp)
 
-prunemodel.fit(train_images, train_labels, epochs=10, validation_split=0.2)
+pruned_model.fit(train_images, train_labels, epochs=10, validation_split=0.2)
 
 
 print("\nCompare model before and after pruning")
-test_loss, test_acc = model.evaluate(test_images,  test_labels, verbose=2)
-test_loss, test_acc = prunemodel.evaluate(test_images,  test_labels, verbose=2)
+model_test_loss, model_test_acc = model.evaluate(test_images,  test_labels, verbose=2)
+pruned_model_test_loss, pruned_model_test_acc = pruned_model.evaluate(test_images,  test_labels, verbose=2)
+print(f"Model accuracy before pruning: {model_test_acc*100:.2f}%")
+print(f"Model accuracy after pruning: {pruned_model_test_acc*100:.2f}%")
 
 print(f"\nTotal number of parameters before pruning: {model.count_params()}")
-print(f"Total number of parameters after pruning: {prunemodel.count_params()}")
-print(f"Pruned model contains only {(prunemodel.count_params()/model.count_params())*100:.2f} % of the original number of parameters.")
+print(f"Total number of parameters after pruning: {pruned_model.count_params()}")
+print(f"Pruned model contains only {(pruned_model.count_params()/model.count_params())*100:.2f} % of the original number of parameters.")
 
 
 print("\nTest accuracy pruning")
@@ -77,8 +85,10 @@ auto_model = pruning.pruning_for_acc(model, train_images, train_labels, comp, pr
 
 
 print("\nCompare model before and after pruning")
-test_loss, test_acc = model.evaluate(test_images,  test_labels, verbose=2)
-test_loss, test_acc = auto_model.evaluate(test_images,  test_labels, verbose=2)
+model_test_loss, model_test_acc = model.evaluate(test_images,  test_labels, verbose=2)
+auto_model_test_loss, auto_model_test_acc = auto_model.evaluate(test_images,  test_labels, verbose=2)
+print(f"Model accuracy before pruning: {model_test_acc*100:.2f}%")
+print(f"Model accuracy after pruning: {auto_model_test_acc*100:.2f}%")
 
 print(f"\nTotal number of parameters before pruning: {model.count_params()}")
 print(f"Total number of parameters after pruning: {auto_model.count_params()}")
