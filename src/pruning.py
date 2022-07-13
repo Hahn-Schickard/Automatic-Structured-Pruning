@@ -7,7 +7,6 @@
 ============================================================================'''
 
 import os
-from tkinter.filedialog import asksaveasfile
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
@@ -128,9 +127,8 @@ def pruning_for_acc(keras_model, comp, x_train, y_train=None, x_val=None,
                 original_model_acc = original_model.evaluate(
                     x_val, y_val)[-1]
         elif os.path.isdir(data_loader_path):
-            if x_val is not None:
-                original_model_acc = original_model.evaluate(
-                    x_val)[-1]
+            original_model_acc = original_model.evaluate(
+                x_val)[-1]
         print("Start model accuracy: " + str(original_model_acc * 100) + "%")
         req_acc = original_model_acc - (max_acc_loss / 100)
 
