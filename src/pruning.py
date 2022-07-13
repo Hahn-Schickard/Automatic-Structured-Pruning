@@ -18,25 +18,25 @@ from pruning_helper_functions_dense import *
 from pruning_helper_functions_conv import *
 
 
-def pruning(keras_model, x_train, y_train, comp, fit, prun_factor_dense=10,
-            prun_factor_conv=10, metric='L1'):
+def factor_pruning(keras_model, prun_factor_dense=10, prun_factor_conv=10,
+                metric='L1', comp=None, num_classes=None, label_one_hot=None):
     """
     A given keras model get pruned. The factor for dense and conv says how
-    many percent of the dense and conv layers should be deleted. After pruning
-    the model will be retrained.
+    many percent of the dense and conv layers should be deleted.
 
     Args:
         keras_model:        Model which should be pruned
-        x_train:            Training data to retrain the model after pruning
-        y_train:            Labels of training data to retrain the model after
-                            pruning
         prun_factor_dense:  Integer which says how many percent of the neurons
                             should be deleted
         prun_factor_conv:   Integer which says how many percent of the filters
                             should be deleted
+        metric:             Metric which should be used for model pruning
+        comp:               Dictionary with compiler settings
+        num_classes:        Number of different classes of the model
+        label_one_hot:      Boolean value if labels are one hot encoded or not
 
     Return:
-        pruned_model:   New model after pruning and retraining
+        pruned_model:      New model after pruning
     """
 
     if callable(getattr(keras_model, "predict", None)):
@@ -46,6 +46,23 @@ def pruning(keras_model, x_train, y_train, comp, fit, prun_factor_dense=10,
     else:
         print("No model given to prune")
 
+    if num_classes <= 2 and comp is None:
+        comp = {
+            "optimizer": 'adam',
+            "loss": tf.keras.losses.BinaryCrossentropy(),
+            "metrics": 'accuracy'}
+    elif num_classes > 3 and comp is None:
+        if label_one_hot:
+            comp = {
+                "optimizer": 'adam',
+                "loss": tf.keras.losses.CategoricalCrossentropy(),
+                "metrics": 'accuracy'}
+        else:
+            comp = {
+                "optimizer": 'adam',
+                "loss": tf.keras.losses.SparseCategoricalCrossentropy(),
+                "metrics": 'accuracy'}
+
     layer_types, layer_params, layer_output_shape, layer_bias, netstr = (
         load_model_param(model))
     num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
@@ -53,20 +70,20 @@ def pruning(keras_model, x_train, y_train, comp, fit, prun_factor_dense=10,
 
     layer_params, num_new_neurons, num_new_filters, layer_output_shape = (
         model_pruning(layer_types, layer_params, layer_output_shape,
-        layer_bias, netstr, num_new_neurons, num_new_filters,
-        prun_factor_dense, prun_factor_conv, metric))
+                      layer_bias, netstr, num_new_neurons, num_new_filters,
+                      prun_factor_dense, prun_factor_conv, metric))
 
     print("Finish with pruning")
 
     pruned_model = build_pruned_model(model, layer_params, layer_types,
                                       num_new_neurons, num_new_filters, comp)
 
-    pruned_model.fit(x_train, y_train, **fit)
+    print("Model built")
 
     return pruned_model
 
 
-def pruning_for_acc(keras_model, comp, x_train, y_train=None, x_val=None,
+def accuracy_pruning(keras_model, comp, x_train, y_train=None, x_val=None,
                     y_val=None, pruning_acc=None, max_acc_loss=5,
                     num_classes=None, label_one_hot=None,
                     data_loader_path=None):
@@ -87,10 +104,9 @@ def pruning_for_acc(keras_model, comp, x_train, y_train=None, x_val=None,
         y_val:              Labels of validation data if data loader used leave
                             it "None"
         pruning_acc:        Integer which says which accuracy value (in %)
-                            should not be fall below. If pruning_acc is not
-                            defined, default is -5%
+                            should not be fall below.
         max_acc_loss:       Integer which says which accuracy loss (in %)
-                            should not be exceed
+                            should not be exceed, default is -5%
         num_classes:        Number of different classes of the model
         label_one_hot:      Boolean value if labels are one hot encoded or not
         data_loader_path:   Path of the folder or file with the training data
@@ -140,7 +156,7 @@ def pruning_for_acc(keras_model, comp, x_train, y_train=None, x_val=None,
 
         print("Next pruning factors: " + str(pruning_factor))
 
-        model = prune_model(original_model, prun_factor_dense=pruning_factor,
+        model = factor_pruning(original_model, prun_factor_dense=pruning_factor,
                             prun_factor_conv=pruning_factor, metric='L1',
                             comp=comp, num_classes=num_classes,
                             label_one_hot=label_one_hot)
@@ -246,70 +262,5 @@ def pruning_for_acc(keras_model, comp, x_train, y_train=None, x_val=None,
                     last_pruning_step = 10
 
         all_pruning_factors.append(pruning_factor)
-
-    return pruned_model
-
-
-def prune_model(keras_model, prun_factor_dense=10, prun_factor_conv=10,
-                metric='L1', comp=None, num_classes=None, label_one_hot=None):
-    """
-    A given keras model get pruned. The factor for dense and conv says how
-    many percent of the dense and conv layers should be deleted.
-
-    Args:
-        keras_model:        Model which should be pruned
-        prun_factor_dense:  Integer which says how many percent of the neurons
-                            should be deleted
-        prun_factor_conv:   Integer which says how many percent of the filters
-                            should be deleted
-        metric:             Metric which should be used for model pruning
-        comp:               Dictionary with compiler settings
-        num_classes:        Number of different classes of the model
-        label_one_hot:      Boolean value if labels are one hot encoded or not
-
-    Return:
-        pruned_model:      New model after pruning
-    """
-
-    if callable(getattr(keras_model, "predict", None)):
-        model = keras_model
-    elif isinstance(keras_model, str) and ".h5" in keras_model:
-        model = load_model(keras_model)
-    else:
-        print("No model given to prune")
-
-    if num_classes <= 2 and comp is None:
-        comp = {
-            "optimizer": 'adam',
-            "loss": tf.keras.losses.BinaryCrossentropy(),
-            "metrics": 'accuracy'}
-    elif num_classes > 3 and comp is None:
-        if label_one_hot:
-            comp = {
-                "optimizer": 'adam',
-                "loss": tf.keras.losses.CategoricalCrossentropy(),
-                "metrics": 'accuracy'}
-        else:
-            comp = {
-                "optimizer": 'adam',
-                "loss": tf.keras.losses.SparseCategoricalCrossentropy(),
-                "metrics": 'accuracy'}
-
-    layer_types, layer_params, layer_output_shape, layer_bias, netstr = (
-        load_model_param(model))
-    num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
-    num_new_filters = np.zeros(shape=len(layer_params), dtype=np.int16)
-
-    layer_params, num_new_neurons, num_new_filters, layer_output_shape = (
-        model_pruning(layer_types, layer_params, layer_output_shape,
-                      layer_bias, netstr, num_new_neurons, num_new_filters,
-                      prun_factor_dense, prun_factor_conv, metric))
-
-    print("Finish with pruning")
-
-    pruned_model = build_pruned_model(model, layer_params, layer_types,
-                                      num_new_neurons, num_new_filters, comp)
-
-    print("Model built")
 
     return pruned_model
