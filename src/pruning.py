@@ -7,6 +7,7 @@
 ============================================================================'''
 
 import os
+from tkinter.filedialog import asksaveasfile
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
@@ -66,9 +67,10 @@ def pruning(keras_model, x_train, y_train, comp, fit, prun_factor_dense=10,
     return pruned_model
 
 
-def pruning_for_acc(keras_model, x_train, x_val_y_train, comp,
-                    pruning_acc=None, max_acc_loss=5, num_classes=None,
-                    label_one_hot=None, data_loader_path=None):
+def pruning_for_acc(keras_model, comp, x_train, y_train=None, x_val=None,
+                    y_val=None, pruning_acc=None, max_acc_loss=5,
+                    num_classes=None, label_one_hot=None,
+                    data_loader_path=None):
     """
     A given keras model gets pruned. Either an accuracy value (in %) can be
     specified, which the minimized model has to still achieve. Or the maximum
@@ -78,11 +80,13 @@ def pruning_for_acc(keras_model, x_train, x_val_y_train, comp,
 
     Args:
         keras_model:        Model which should be pruned
-        x_train:            Training data to retrain the model after pruning
-        x_val_y_train:      Labels of training data or validation data to
-                            retrain the model after pruning (depends on whether
-                            the data is a data loader or a numpy array)
         comp:               Compiler settings
+        x_train:            Training data to retrain the model after pruning
+        y_train:            Labels of training data if data loader used leave
+                            it "None"
+        x_val:              Validation data
+        y_val:              Labels of validation data if data loader used leave
+                            it "None"
         pruning_acc:        Integer which says which accuracy value (in %)
                             should not be fall below. If pruning_acc is not
                             defined, default is -5%
@@ -115,12 +119,18 @@ def pruning_for_acc(keras_model, x_train, x_val_y_train, comp,
         req_acc = pruning_acc / 100
     else:
         if data_loader_path == None or os.path.isfile(data_loader_path):
-            x_train, x_val, y_train, y_val = train_test_split(
-                x_train, x_val_y_train, test_size=0.2)
-            original_model_acc = original_model.evaluate(
-                x_val, y_val)[-1]
+            if x_val is not None and y_val is not None:
+                original_model_acc = original_model.evaluate(
+                    x_val, y_val)[-1]
+            else:
+                x_train, x_val, y_train, y_val = train_test_split(
+                    x_train, y_train, test_size=0.2)
+                original_model_acc = original_model.evaluate(
+                    x_val, y_val)[-1]
         elif os.path.isdir(data_loader_path):
-            original_model_acc = original_model.evaluate(x_val_y_train)[-1]
+            if x_val is not None:
+                original_model_acc = original_model.evaluate(
+                    x_val)[-1]
         print("Start model accuracy: " + str(original_model_acc * 100) + "%")
         req_acc = original_model_acc - (max_acc_loss / 100)
 
@@ -144,8 +154,8 @@ def pruning_for_acc(keras_model, x_train, x_val_y_train, comp,
         elif os.path.isdir(data_loader_path):
             history = model.fit_generator(
                 x_train, steps_per_epoch=len(x_train),
-                validation_data=x_val_y_train,
-                validation_steps=len(x_val_y_train),
+                validation_data=x_val,
+                validation_steps=len(x_val),
                 epochs=train_epochs, callbacks=callbacks)
 
         if history.history['val_accuracy'][-1] < req_acc:

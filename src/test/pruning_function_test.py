@@ -80,8 +80,9 @@ comp = {
   "metrics": 'accuracy'
 }
 
-auto_model = pruning.pruning_for_acc(model, train_images, train_labels, comp, pruning_acc=None,
-                                  max_acc_loss=5, num_classes=10, label_one_hot=False)
+auto_model = pruning.pruning_for_acc(model, comp, train_images, train_labels, test_images,
+                                     test_labels, pruning_acc=None, max_acc_loss=3,
+                                     num_classes=10, label_one_hot=False)
 
 
 print("\nCompare model before and after pruning")
