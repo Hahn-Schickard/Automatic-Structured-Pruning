@@ -31,4 +31,4 @@ jobs:
         pip install -r "requirements.txt"
     - name: Run pruning function test script
       run: |
-        python src/test/pruning_function_test.py
+        python tests/pruning_function_test.py

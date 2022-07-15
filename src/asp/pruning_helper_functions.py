@@ -11,9 +11,9 @@ import numpy as np
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import Model
 
-from pruning_helper_classes import *
-from pruning_helper_functions_dense import *
-from pruning_helper_functions_conv import *
+from .pruning_helper_classes import *
+from .pruning_helper_functions_dense import *
+from .pruning_helper_functions_conv import *
 
 
 def get_last_layer_with_params(layer_params):

@@ -48,7 +48,7 @@ print(f"Model accuracy after Training: {model_test_acc*100:.2f}%")
 print("\nTest factor pruning")
 dense_prune_rate=30
 conv_prune_rate=40
-pruned_model=pruning.factor_pruning(model, dense_prune_rate, conv_prune_rate,'L2', num_classes=10)
+pruned_model=pruning.factor_pruning(model, dense_prune_rate, conv_prune_rate,'L2')
 
 
 print("\nCompile, retrain and evaluate pruned model")
@@ -82,7 +82,7 @@ comp = {
 
 auto_model = pruning.accuracy_pruning(model, comp, train_images, train_labels, test_images,
                                      test_labels, pruning_acc=None, max_acc_loss=3,
-                                     num_classes=10, label_one_hot=False)
+                                     label_one_hot=False)
 
 
 print("\nCompare model before and after pruning")
