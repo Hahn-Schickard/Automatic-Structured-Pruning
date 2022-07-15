@@ -6,11 +6,20 @@
    SPDX-License-Identifier: Apache-2.0
 ============================================================================'''
 
-import os
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from sklearn.model_selection import train_test_split
+
+from .pruning_helper_classes import NetStructure, ThresholdCallback
+from .pruning_helper_functions import get_last_layer_with_params, \
+    load_model_param, model_pruning, build_pruned_model
+from .pruning_helper_functions_dense import get_layer_shape_dense, \
+    delete_dense_neuron, get_neurons_to_prune_l1, get_neurons_to_prune_l2, \
+        prun_neurons_dense
+from .pruning_helper_functions_conv import get_layer_shape_conv, \
+    delete_filter, get_filter_to_prune_avarage, get_filter_to_prune_l2, \
+        prun_filters_conv
 
 
 def factor_pruning(keras_model, prun_factor_dense=10, prun_factor_conv=10,

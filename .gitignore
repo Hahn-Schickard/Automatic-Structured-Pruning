@@ -1,2 +1,5 @@
+build
+examples/.ipynb_checkpoints
 examples/*.h5
 src/__pycache__
+src/asp.egg-info

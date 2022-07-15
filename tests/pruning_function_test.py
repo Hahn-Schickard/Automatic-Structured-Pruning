@@ -3,7 +3,7 @@ import sys
 currentdir = os.path.dirname(os.path.realpath(__file__))
 parentdir = os.path.dirname(currentdir)
 sys.path.append(parentdir)
-import pruning
+import asp as pruning
 import tensorflow as tf
 from tensorflow.keras import datasets, layers, models
 
@@ -34,7 +34,8 @@ print("\nCompile, train and evaluate model")
 comp = {
 "optimizer":'adam',
 "loss": tf.keras.losses.SparseCategoricalCrossentropy(),
-"metrics": ['accuracy']}
+"metrics": ['accuracy']
+}
 
 model.compile(**comp)
 callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)]
@@ -45,6 +46,8 @@ model_test_loss, model_test_acc = model.evaluate(test_images, test_labels, verbo
 print(f"Model accuracy after Training: {model_test_acc*100:.2f}%")
 
 
+
+'---Factor pruning---'
 print("\nTest factor pruning")
 dense_prune_rate=30
 conv_prune_rate=40
@@ -52,10 +55,6 @@ pruned_model=pruning.factor_pruning(model, dense_prune_rate, conv_prune_rate,'L2
 
 
 print("\nCompile, retrain and evaluate pruned model")
-comp = {
-"optimizer":'adam',
-"loss": tf.keras.losses.SparseCategoricalCrossentropy(),
-"metrics": ['accuracy']}
 
 pruned_model.compile(**comp)
 
@@ -73,12 +72,9 @@ print(f"Total number of parameters after pruning: {pruned_model.count_params()}"
 print(f"Pruned model contains only {(pruned_model.count_params()/model.count_params())*100:.2f} % of the original number of parameters.")
 
 
+
+'---Accuracy pruning---'
 print("\nTest accuracy pruning")
-comp = {
-  "optimizer": 'adam',
-  "loss": tf.keras.losses.SparseCategoricalCrossentropy(),
-  "metrics": 'accuracy'
-}
 
 auto_model = pruning.accuracy_pruning(model, comp, train_images, train_labels, test_images,
                                      test_labels, pruning_acc=None, max_acc_loss=3,
@@ -94,3 +90,44 @@ print(f"Model accuracy after pruning: {auto_model_test_acc*100:.2f}%")
 print(f"\nTotal number of parameters before pruning: {model.count_params()}")
 print(f"Total number of parameters after pruning: {auto_model.count_params()}")
 print(f"Pruned model contains only {(auto_model.count_params()/model.count_params())*100:.2f} % of the original number of parameters.")
+
+
+
+'---Stepwise factor pruning---'
+print("\nTest stepwise factor pruning")
+
+step_factor_model = pruning.stepwise_factor_pruning(model, train_images, train_labels, test_images,
+                               test_labels, prun_factor_dense=10, prun_factor_conv=10,
+                               num_steps=10, comp=comp)
+
+
+print("\nCompare model before and after pruning")
+model_test_loss, model_test_acc = model.evaluate(test_images,  test_labels, verbose=2)
+step_factor_model_test_loss, step_factor_model_test_acc = step_factor_model.evaluate(test_images,  test_labels, verbose=2)
+print(f"Model accuracy before pruning: {model_test_acc*100:.2f}%")
+print(f"Model accuracy after pruning: {step_factor_model_test_acc*100:.2f}%")
+
+print(f"Total number of parameters before pruning: {model.count_params()}")
+print(f"Total number of parameters after pruning: {step_factor_model.count_params()}")
+print(f"Pruned model contains only {(step_factor_model.count_params()/model.count_params())*100:.2f}% of the original number of parameters.")
+
+
+
+'---Stepwise accuracy pruning---'
+print("\nTest stepwise accuracy pruning")
+
+step_acc_model = pruning.stepwise_accuracy_pruning(model, train_images, train_labels, test_images,
+                            test_labels, pruning_acc=None, max_acc_loss=3,
+                            prun_factor_dense=5, prun_factor_conv=5, 
+                            metric='L1', comp=comp, label_one_hot=False)
+
+
+print("\nCompare model before and after pruning")
+model_test_loss, model_test_acc = model.evaluate(test_images,  test_labels, verbose=2)
+step_acc_model_test_loss, step_acc_model_test_acc = step_acc_model.evaluate(test_images,  test_labels, verbose=2)
+print(f"Model accuracy before pruning: {model_test_acc*100:.2f}%")
+print(f"Model accuracy after pruning: {step_acc_model_test_acc*100:.2f}%")
+
+print(f"Total number of parameters before pruning: {model.count_params()}")
+print(f"Total number of parameters after pruning: {step_acc_model.count_params()}")
+print(f"Pruned model contains only {(step_acc_model.count_params()/model.count_params())*100:.2f}% of the original number of parameters.")

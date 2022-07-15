@@ -6,12 +6,20 @@ build-backend = "setuptools.build_meta"
 name = "asp"
 version = "0.1.0"
 authors = [
-  {name="Daniel Konegen", email="Daniel.Konegen@Hahn-Schickard.de"}
+  {name="Daniel Konegen", email="Daniel.Konegen@Hahn-Schickard.de"},
+  {name="Marcus Rueb", email="Marcus.Rueb@Hahn-Schickard.de"}
 ]
-description = "Structured pruning of TensorFlow models"
+description = "Automatic structured pruning of TensorFlow models"
 readme = "README.md"
 license = { file="LICENSE" }
 requires-python = ">=3.7"
+dependencies = [
+    "numpy==1.19.*",
+    "Tensorflow-gpu==2.5.*",
+    "scikit-learn==1.1.1",
+    "typing==3.7.4.*",
+    "protobuf==3.20.*",
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache-2.0",
