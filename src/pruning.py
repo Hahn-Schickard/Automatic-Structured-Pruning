@@ -1,25 +1,33 @@
-'''Copyright [2020] Hahn-Schickard-Gesellschaft fuer angewandte Forschung e.V.,
+"""Copyright [2020] Hahn-Schickard-Gesellschaft fuer angewandte Forschung e.V.,
                     Daniel Konegen + Marcus Rueb
    Copyright [2021] Karlsruhe Institute of Technology, Daniel Konegen
    Copyright [2022] Hahn-Schickard-Gesellschaft fuer angewandte Forschung e.V.,
                     Daniel Konegen + Marcus Rueb
    SPDX-License-Identifier: Apache-2.0
-============================================================================'''
+============================================================================"""
 
 import os
+
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.models import load_model
 from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import load_model
 
 from pruning_helper_classes import *
 from pruning_helper_functions import *
-from pruning_helper_functions_dense import *
 from pruning_helper_functions_conv import *
+from pruning_helper_functions_dense import *
 
 
-def factor_pruning(keras_model, prun_factor_dense=10, prun_factor_conv=10,
-                metric='L1', comp=None, num_classes=None, label_one_hot=None):
+def factor_pruning(
+    keras_model,
+    prun_factor_dense=10,
+    prun_factor_conv=10,
+    metric="L1",
+    comp=None,
+    num_classes=None,
+    label_one_hot=None,
+):
     """
     A given keras model get pruned. The factor for dense and conv says how
     many percent of the dense and conv layers should be deleted.
@@ -48,45 +56,67 @@ def factor_pruning(keras_model, prun_factor_dense=10, prun_factor_conv=10,
 
     if num_classes <= 2 and comp is None:
         comp = {
-            "optimizer": 'adam',
+            "optimizer": "adam",
             "loss": tf.keras.losses.BinaryCrossentropy(),
-            "metrics": 'accuracy'}
+            "metrics": "accuracy",
+        }
     elif num_classes > 3 and comp is None:
         if label_one_hot:
             comp = {
-                "optimizer": 'adam',
+                "optimizer": "adam",
                 "loss": tf.keras.losses.CategoricalCrossentropy(),
-                "metrics": 'accuracy'}
+                "metrics": "accuracy",
+            }
         else:
             comp = {
-                "optimizer": 'adam',
+                "optimizer": "adam",
                 "loss": tf.keras.losses.SparseCategoricalCrossentropy(),
-                "metrics": 'accuracy'}
+                "metrics": "accuracy",
+            }
 
     layer_types, layer_params, layer_output_shape, layer_bias, netstr = (
-        load_model_param(model))
+        load_model_param(model)
+    )
     num_new_neurons = np.zeros(shape=len(layer_params), dtype=np.int16)
     num_new_filters = np.zeros(shape=len(layer_params), dtype=np.int16)
 
-    layer_params, num_new_neurons, num_new_filters, layer_output_shape = (
-        model_pruning(layer_types, layer_params, layer_output_shape,
-                      layer_bias, netstr, num_new_neurons, num_new_filters,
-                      prun_factor_dense, prun_factor_conv, metric))
+    layer_params, num_new_neurons, num_new_filters, layer_output_shape = model_pruning(
+        layer_types,
+        layer_params,
+        layer_output_shape,
+        layer_bias,
+        netstr,
+        num_new_neurons,
+        num_new_filters,
+        prun_factor_dense,
+        prun_factor_conv,
+        metric,
+    )
 
     print("Finish with pruning")
 
-    pruned_model = build_pruned_model(model, layer_params, layer_types,
-                                      num_new_neurons, num_new_filters, comp)
+    pruned_model = build_pruned_model(
+        model, layer_params, layer_types, num_new_neurons, num_new_filters, comp
+    )
 
     print("Model built")
 
     return pruned_model
 
 
-def accuracy_pruning(keras_model, comp, x_train, y_train=None, x_val=None,
-                    y_val=None, pruning_acc=None, max_acc_loss=5,
-                    num_classes=None, label_one_hot=None,
-                    data_loader_path=None):
+def accuracy_pruning(
+    keras_model,
+    comp,
+    x_train,
+    y_train=None,
+    x_val=None,
+    y_val=None,
+    pruning_acc=None,
+    max_acc_loss=5,
+    num_classes=None,
+    label_one_hot=None,
+    data_loader_path=None,
+):
     """
     A given keras model gets pruned. Either an accuracy value (in %) can be
     specified, which the minimized model has to still achieve. Or the maximum
@@ -135,16 +165,14 @@ def accuracy_pruning(keras_model, comp, x_train, y_train=None, x_val=None,
     else:
         if data_loader_path == None or os.path.isfile(data_loader_path):
             if x_val is not None and y_val is not None:
-                original_model_acc = original_model.evaluate(
-                    x_val, y_val)[-1]
+                original_model_acc = original_model.evaluate(x_val, y_val)[-1]
             else:
                 x_train, x_val, y_train, y_val = train_test_split(
-                    x_train, y_train, test_size=0.2)
-                original_model_acc = original_model.evaluate(
-                    x_val, y_val)[-1]
+                    x_train, y_train, test_size=0.2
+                )
+                original_model_acc = original_model.evaluate(x_val, y_val)[-1]
         elif os.path.isdir(data_loader_path):
-            original_model_acc = original_model.evaluate(
-                x_val)[-1]
+            original_model_acc = original_model.evaluate(x_val)[-1]
         print("Start model accuracy: " + str(original_model_acc * 100) + "%")
         req_acc = original_model_acc - (max_acc_loss / 100)
 
@@ -156,23 +184,36 @@ def accuracy_pruning(keras_model, comp, x_train, y_train=None, x_val=None,
 
         print("Next pruning factors: " + str(pruning_factor))
 
-        model = factor_pruning(original_model, prun_factor_dense=pruning_factor,
-                            prun_factor_conv=pruning_factor, metric='L1',
-                            comp=comp, num_classes=num_classes,
-                            label_one_hot=label_one_hot)
+        model = factor_pruning(
+            original_model,
+            prun_factor_dense=pruning_factor,
+            prun_factor_conv=pruning_factor,
+            metric="L1",
+            comp=comp,
+            num_classes=num_classes,
+            label_one_hot=label_one_hot,
+        )
 
         if data_loader_path == None or os.path.isfile(data_loader_path):
-            history = model.fit(x=x_train, y=y_train, batch_size=64,
-                                validation_data=(x_val, y_val),
-                                epochs=train_epochs, callbacks=callbacks)
+            history = model.fit(
+                x=x_train,
+                y=y_train,
+                batch_size=64,
+                validation_data=(x_val, y_val),
+                epochs=train_epochs,
+                callbacks=callbacks,
+            )
         elif os.path.isdir(data_loader_path):
             history = model.fit_generator(
-                x_train, steps_per_epoch=len(x_train),
+                x_train,
+                steps_per_epoch=len(x_train),
                 validation_data=x_val,
                 validation_steps=len(x_val),
-                epochs=train_epochs, callbacks=callbacks)
+                epochs=train_epochs,
+                callbacks=callbacks,
+            )
 
-        if history.history['val_accuracy'][-1] < req_acc:
+        if history.history["val_accuracy"][-1] < req_acc:
             # Required accuracy is not reached
             if lowest_pruning_factor_not_working > pruning_factor:
                 lowest_pruning_factor_not_working = pruning_factor
@@ -182,8 +223,10 @@ def accuracy_pruning(keras_model, comp, x_train, y_train=None, x_val=None,
                 return original_model
 
             if last_pruning_step == 2:
-                print("Pruningfactor dense and conv: " +
-                      str(pruning_factor - last_pruning_step))
+                print(
+                    "Pruningfactor dense and conv: "
+                    + str(pruning_factor - last_pruning_step)
+                )
                 return pruned_model
             elif last_pruning_step == 5:
                 pruning_factor -= 3
@@ -199,40 +242,42 @@ def accuracy_pruning(keras_model, comp, x_train, y_train=None, x_val=None,
             # Required accuracy is reached
             pruned_model = model
             # Set pruning factor for next pruning step
-            if (len(history.history['val_accuracy']) <=
-                    int(0.3 * train_epochs)):
+            if len(history.history["val_accuracy"]) <= int(0.3 * train_epochs):
                 pruning_factor += 15
                 last_pruning_step = 15
-            elif (len(history.history['val_accuracy']) <=
-                    int(0.5 * train_epochs)):
+            elif len(history.history["val_accuracy"]) <= int(0.5 * train_epochs):
                 pruning_factor += 10
                 last_pruning_step = 10
-            elif (len(history.history['val_accuracy']) <=
-                    int(0.7 * train_epochs)):
+            elif len(history.history["val_accuracy"]) <= int(0.7 * train_epochs):
                 pruning_factor += 5
                 last_pruning_step = 5
-            elif (len(history.history['val_accuracy']) >
-                    int(0.7 * train_epochs)):
+            elif len(history.history["val_accuracy"]) > int(0.7 * train_epochs):
                 pruning_factor += 2
                 last_pruning_step = 2
 
         if lowest_pruning_factor_not_working < pruning_factor:
             # Check if pruning factor is higher than the lowest one which
             # didn't work and adjust the pruning factor if it's true
-            if (lowest_pruning_factor_not_working -
-                    (pruning_factor - last_pruning_step) <= 2):
-                print("Pruningfactor dense and conv: " +
-                      str(pruning_factor - last_pruning_step))
+            if (
+                lowest_pruning_factor_not_working - (pruning_factor - last_pruning_step)
+                <= 2
+            ):
+                print(
+                    "Pruningfactor dense and conv: "
+                    + str(pruning_factor - last_pruning_step)
+                )
                 return pruned_model
-            elif (lowest_pruning_factor_not_working -
-                    (pruning_factor - last_pruning_step) <= 5):
+            elif (
+                lowest_pruning_factor_not_working - (pruning_factor - last_pruning_step)
+                <= 5
+            ):
                 pruning_factor = (pruning_factor - last_pruning_step) + 2
                 last_pruning_step = 2
 
         if all_pruning_factors.count(pruning_factor) >= 1:
             # Check if the pruning factor for next iteration was already
             # applied
-            if history.history['val_accuracy'][-1] < req_acc:
+            if history.history["val_accuracy"][-1] < req_acc:
                 # If required accuracy wasn't reached, the pruning factor is
                 # lowered in the step before. If the new pruning factor was
                 # already applied, this is one which worked, so you increase

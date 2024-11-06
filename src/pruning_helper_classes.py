@@ -1,13 +1,14 @@
-'''Copyright [2020] Hahn-Schickard-Gesellschaft fuer angewandte Forschung e.V.,
+"""Copyright [2020] Hahn-Schickard-Gesellschaft fuer angewandte Forschung e.V.,
                     Daniel Konegen + Marcus Rueb
    Copyright [2021] Karlsruhe Institute of Technology, Daniel Konegen
    Copyright [2022] Hahn-Schickard-Gesellschaft fuer angewandte Forschung e.V.,
                     Daniel Konegen + Marcus Rueb
    SPDX-License-Identifier: Apache-2.0
-============================================================================'''
+============================================================================"""
+
+from typing import NamedTuple
 
 import tensorflow as tf
-from typing import NamedTuple
 
 
 class NetStructure(NamedTuple):
