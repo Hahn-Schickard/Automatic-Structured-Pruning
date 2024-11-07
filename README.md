@@ -18,7 +18,7 @@ Additionally, the Automatic-Structured-Pruning is part of the Tool [AutoFlow](ht
 
 
 # Restrictions:
-- The tool is tested with Tensorflow 2.5
+- The tool is tested with Tensorflow 2.10
 - It only supports magnitude-based pruning
 
 
