@@ -1,4 +1,4 @@
-name: Function Test
+name: Funktionstest
 
 on: 
   push:
@@ -11,17 +11,15 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Miniconda
-      uses: conda-incubator/setup-miniconda@v3
+    - name: Setze Python 3.10
+      uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-        auto-activate-base: false
-        activate-environment: myenv
-        use-mamba: true
-    - name: Install Dependencies
+        architecture: x64
+    - name: Installiere Abhängigkeiten
       run: |
-        conda install -y pip
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
-    - name: Run Pruning Function Test Script
+    - name: Führe Pruning-Funktionstest aus
       run: |
         python src/test/pruning_function_test.py
