@@ -1,4 +1,4 @@
-name: Function test
+name: Function Test
 
 on: 
   push:
@@ -14,13 +14,14 @@ jobs:
     - name: Set up Miniconda
       uses: conda-incubator/setup-miniconda@v3
       with:
-        python-version: 3.10
+        python-version: '3.10'
         auto-activate-base: false
         activate-environment: myenv
-    - name: Install dependencies
+        use-mamba: true
+    - name: Install Dependencies
       run: |
         conda install -y pip
         pip install -r requirements.txt
-    - name: Run pruning function test script
+    - name: Run Pruning Function Test Script
       run: |
         python src/test/pruning_function_test.py
